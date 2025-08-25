@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="en-us">
+    <head>
+        <title>EPD Earth Signals Viewer</title>
+        <meta charset="utf-8">
+		<meta name="viewport" content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0">
+        <link type="text/css" rel="stylesheet" href="/styles.css">
+        <link rel="shortcut icon" type="image/png" sizes="32x32" href="/favicon-32x32.png">
+    </head>
+
+    <body>
+        <div id="controls">
+            <audio id="audioStream" preload="none" crossorigin src=""></audio>
+            &nbsp;stream:
+            <input type="url" id="streamURL" value="" size="50" />
+            &nbsp;
+            <button type="button" id="playButton" value="play">&#x23F5; Play</button>
+            &nbsp;sample-rate:
+            <input type="text" id="streamSampleRate" value="" size="5" />
+            &nbsp;display
+            <input type="text" id="displayFreqMin" value="" size="5" /> Hz to
+            <input type="text" id="displayFreqMax" value="" size="5" /> Hz
+        </div>
+
+        <br />
+        <canvas id="spectrum" height="512"></canvas>
+        <canvas id="waterfall" height="512"></canvas>
+
+        <script src="/index.js"></script>
+    </body>
+</html>
