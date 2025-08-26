@@ -3,6 +3,8 @@
 let audioCtx;
 let analyserNode;
 let playButton;
+let pauseButton;
+let stopButton;
 let sampleArray;
 let canvasSpectrumEl;
 let canvasSpectrumCtx;
@@ -15,8 +17,6 @@ let audioStreamEl;
 let audioSourceNode;
 let javascriptNode;
 let streamURL = "http://hakasays.com:8443/EPDAntennaField";
-let streamSampleRateEl;
-let streamSampleRate;
 let streamURLEl;
 let displayFreqMinEl;
 let displayFreqMaxEl;
@@ -24,33 +24,26 @@ let displayFreqMin;
 let displayFreqMax;
 let colorMap;
 let uiBg;
+let fileLocalEl;
+let paused = false;
+let sourceSelectEl;
+let mediaElementSrc;
 const yAxisX = 25;
 const xAxisY = 20;
 const yAxisDataMargin = 5;
 const xAxisDataMargin = 2;
 const tickLength = 4;
 const labelMargin = 2;
+let audioSourceIsFile = false;
+let fileDecodedBuffer;
+let smoothingSelectEl;
+let updateParameter = false;
 
 
-function fetchAudioFile(audioFile) {
-    let rval;
-    fetch(audioFile)
-        .then((response) => response.arrayBuffer())
-        .then((downloadedBuffer) => audioCtx.decodeAudioData(downloadedBuffer))
-        .then((decodedBuffer) => {
-            const audioSourceNode = new AudioBufferSourceNode(audioCtx, {
-              buffer: decodedBuffer,
-              loop: true,
-            });
-
-            main2();
-        })
-        .catch((e) => {
-            console.error(`Error: ${e}`);
-      });
-}
-
+// Graphics update routine called frequently.
 function processAudio() {
+    if (paused)
+        return;
     analyserNode.getFloatFrequencyData(sampleArray);
     const canvasWidth = canvasSpectrumEl.width;
     const canvasHeight = canvasSpectrumEl.height;
@@ -109,9 +102,32 @@ function processAudio() {
 }
 
 function constructAudioPipeline() {
-    streamSampleRate = parseInt(streamSampleRateEl.value);
     displayFreqMin = parseInt(displayFreqMinEl.value);
     displayFreqMax = parseInt(displayFreqMaxEl.value);
+
+    // Disconnect previously created nodes.
+    if (analyserNode)
+        analyserNode.disconnect();
+    if (javascriptNode)
+        javascriptNode.disconnect();
+    if (audioSourceNode)
+        audioSourceNode.disconnect();
+
+    if (audioSourceIsFile) { // File.
+        // Create a buffer source node from previously decoded file.
+        audioSourceNode = new AudioBufferSourceNode(audioCtx, {
+          buffer: fileDecodedBuffer,
+          loop: false,
+        });
+        audioSourceNode.addEventListener("ended", () => {
+            playbackStopped();
+            });
+    } else { // Web stream.
+        if (!mediaElementSrc) // Only createMediaElementSource() once as it stays attached to the element (bug).
+            mediaElementSrc = audioSourceNode = audioCtx.createMediaElementSource(audioStreamEl);
+        else
+            audioSourceNode = mediaElementSrc;
+    }
 
     // Check if context is in suspended state (autoplay policy)
     if (audioCtx.state === "suspended") {
@@ -120,8 +136,8 @@ function constructAudioPipeline() {
 
     analyserNode = new AnalyserNode(audioCtx);
     analyserNode.fftSize = 2048;
+    analyserNode.smoothingTimeConstant = Number(smoothingSelectEl.value);
     sampleArray = new Float32Array(analyserNode.frequencyBinCount); // Half the size of fftSize.
-    //analyserNode.smoothingTimeConstant = 0.85;
     createSpectrumAxes();
     const numInputChannels = 1;
     const numOutputChannels = 1;
@@ -135,35 +151,9 @@ function constructAudioPipeline() {
     analyserNode.connect(javascriptNode);
     analyserNode.connect(audioCtx.destination);
     javascriptNode.connect(audioCtx.destination);
-}
-
-function main2() {
-    playButton.addEventListener("click", (e) => {
-        // For local mp3
-        // audioSourceNode.start(0); // Play the sound now
-
-        if (playButton.getAttribute("value") === "play") {
-            const url = streamURLEl.value;
-            playButton.setAttribute("value", "pause");
-            playButton.innerHTML = "&#x23F8; Pause";
-            audioStreamEl.setAttribute("src", url);
-            audioStreamEl.play();
-            constructAudioPipeline();
-            javascriptNode.onaudioprocess = () => { processAudio() };
-        } else if (playButton.getAttribute("value") === "pause") {
-            playButton.setAttribute("value", "play");
-            playButton.innerHTML = "&#x23F5; Play";
-            audioStreamEl.pause();
-            audioStreamEl.currentTime = 0; // Effectively a stop instead of pause.
-            javascriptNode.onaudioprocess = () => { };
-        }
-    });
-
-    audioStreamEl.addEventListener("ended", () => {
-        playButton.setAttribute("value", "play");
-        playButton.innerHTML = "&#x23F5; Play";
-        javascriptNode.onaudioprocess = () => { };
-    });
+    javascriptNode.onaudioprocess = () => { processAudio() };
+    if (audioSourceIsFile)
+        audioSourceNode.start(0); // Play the sound file.
 }
 
 function createColorMap() {
@@ -220,7 +210,7 @@ function createSpectrumAxes() {
 
     // X axis ticks / labels.
     const bins = analyserNode.frequencyBinCount;
-    const binBandwidth = streamSampleRate / bins;
+    const binBandwidth = audioCtx.sampleRate / bins;
     const displayBandwidth = displayFreqMax - displayFreqMin;
     let xAxisInterval;
     if (displayBandwidth >= 44100)
@@ -259,8 +249,52 @@ function createSpectrumAxes() {
     }
 }
 
+function setupLocalFileListener() {
+    // Local file select box.
+    fileLocalEl.addEventListener('change', function (e) {
+        const file = e.target.files[0];
+        if (!file.type.startsWith("audio")) {
+            // Error:  FIXME
+            return;
+        }
+
+        const reader = new FileReader();
+        reader.onload = () => {
+            audioCtx.decodeAudioData(reader.result).then((decodedBuffer) => {
+                fileDecodedBuffer = decodedBuffer;
+                playButton.disabled = false; // Play button now active.
+            });
+        };
+        reader.onerror = () => {
+            // Error: FIXME
+        };
+
+        reader.readAsArrayBuffer(file);
+    });
+}
+
+// Housekeeping for when playback stops.
+function playbackStopped() {
+    pauseButton.disabled = true;
+    stopButton.disabled = true;
+    sourceSelectEl.disabled = false; // Enable source selects.
+
+    if (audioSourceIsFile) {
+        playButton.disabled = true; // Play button disabled until new file loaded.
+        fileLocalEl.disabled = false; // Enable another file select.
+    } else {
+        playButton.disabled = false; // Play button enabled.
+        fileLocalEl.disabled = true; // Disable file select.
+    }
+    fileLocalEl.value = ""; // Prevent caching in case it's reloaded.
+    javascriptNode.onaudioprocess = () => { };
+}
+
 function main() {
     playButton = document.querySelector("#playButton");
+    pauseButton = document.querySelector("#pauseButton");
+    stopButton = document.querySelector("#stopButton");
+
     canvasSpectrumEl = document.querySelector("#spectrum");
     canvasSpectrumCtx = canvasSpectrumEl.getContext("2d");
     canvasWaterfallEl = document.querySelector("#waterfall");
@@ -290,8 +324,6 @@ function main() {
     streamURLEl = document.querySelector("#streamURL");
     streamURLEl.setAttribute("value", streamURL + ".ogg");
     audioStreamEl = document.querySelector("#audioStream");
-    streamSampleRateEl = document.querySelector("#streamSampleRate");
-    streamSampleRateEl.value = "44100";
 
     displayFreqMinEl = document.querySelector("#displayFreqMin");
     displayFreqMinEl.value = "0";
@@ -300,14 +332,92 @@ function main() {
     displayFreqMaxEl.value = "44100";
     displayFreqMaxEl.disabled = true;
 
-    // let audioFile = "haka.mp3";
-    // fetchAudioFile(audioFile);
+    sourceSelectEl = document.querySelector("#sourceSelect");
+    let feedStreamDiv = document.querySelector("#feedStream");
+    let feedFileLocalDiv = document.querySelector("#feedFileLocal");
+    fileLocalEl = document.querySelector("#fileLocal");
+    let feed = "stream";
+
+    smoothingSelectEl = document.querySelector("#smoothingSelect");
 
     audioCtx = new AudioContext();
-    audioSourceNode = audioCtx.createMediaElementSource(audioStreamEl);
 
-    main2();
+    sourceSelectEl.addEventListener('change', function (e) {
+        const val = e.target.value;
+        if (val == "local") {
+            feedStreamDiv.style.display = "none";
+            feedFileLocalDiv.style.display = "inline-block";
+            feed = val;
+            // Media control buttons disabled until file loads.
+            playButton.disabled = true;
+            pauseButton.disabled = true;
+            stopButton.disabled = true;
+            setupLocalFileListener();
+            audioSourceIsFile = true;
+            fileLocalEl.disabled = false; // Enable file select.
+        } else if (val == "stream") {
+            feedFileLocalDiv.style.display = "none";
+            feedStreamDiv.style.display = "inline-block";
+            feed = val;
+            playButton.disabled = false; // Play button active.
+            pauseButton.disabled = true;
+            stopButton.disabled = true;
+            audioSourceIsFile = false;
+            fileLocalEl.disabled = true; // Disable file select.
+        } else {
+            // Error: FIXME:
+        }
+    });
+
+    // Play button.
+    playButton.addEventListener("click", (e) => {
+        sourceSelectEl.disabled = true; // Disable source selects.
+        fileLocalEl.disabled = true; // Disable file selects.
+        playButton.disabled = true;
+        stopButton.disabled = false; // Stop button active.
+        if (audioSourceIsFile) {
+            pauseButton.disabled = false; // Audio files enable pause/stop buttons.
+        } else {
+            pauseButton.disabled = true;
+            const url = streamURLEl.value;
+            audioStreamEl.src = url;
+            audioStreamEl.play();
+        }
+        constructAudioPipeline();
+    });
+
+    // Stop button.
+    stopButton.addEventListener("click", (e) => {
+        paused = false;
+        if (audioSourceIsFile) {
+            audioSourceNode.stop(0);
+        } else {
+            audioStreamEl.pause();
+            audioStreamEl.currentTime = 0; // Effectively a stop instead of pause.
+        }
+        playbackStopped();
+    });
+
+    // Pause button (for audio files only).
+    pauseButton.addEventListener("click", (e) => {
+        if (paused) {
+            audioSourceNode.playbackRate.value = 1; // Resume.
+            paused = false;
+        } else {
+            audioSourceNode.playbackRate.value = 0; // Pause.
+            paused = true;
+        }
+    });
+
+    // Web audio stream ended event.
+    audioStreamEl.addEventListener("ended", () => {
+        playbackStopped();
+    });
+
+    smoothingSelectEl.addEventListener('change', function (e) {
+        if (analyserNode)
+            analyserNode.smoothingTimeConstant = Number(smoothingSelectEl.value);
+    })
 }
-
 
 document.addEventListener('DOMContentLoaded', () => main());

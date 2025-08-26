@@ -9,17 +9,63 @@
     </head>
 
     <body>
+        <!-- Hidden -->
+        <audio id="audioStream" preload="none" crossorigin src=""></audio>
+
+        <!-- Controls area -->
         <div id="controls">
-            <audio id="audioStream" preload="none" crossorigin src=""></audio>
-            &nbsp;stream:
-            <input type="url" id="streamURL" value="" size="50" />
-            &nbsp;
-            <button type="button" id="playButton" value="play">&#x23F5; Play</button>
-            &nbsp;sample-rate:
-            <input type="text" id="streamSampleRate" value="" size="5" />
-            &nbsp;display
-            <input type="text" id="displayFreqMin" value="" size="5" /> Hz to
-            <input type="text" id="displayFreqMax" value="" size="5" /> Hz
+            <!-- Source row -->
+            <div style="display:block; width:100%">
+                <!-- feed select area -->
+                <div style="float:left">
+                    &nbsp;
+                    <select id="sourceSelect">
+                        <option value="stream">audio stream</option>
+                        <option value="local">local file</option>
+                    </select>
+
+                    <!-- stream info (when selected) -->
+                    <div id="feedStream" style="display:inline-block">
+                        &nbsp;url:
+                        <input type="url" id="streamURL" value="" size="50" />
+                    </div>
+
+                    <!-- local file info (when selected) -->
+                    <div id="feedFileLocal" style="display:none">
+                        &nbsp;<input type="file" id="fileLocal" accept="audio/*" />
+                    </div>
+                </div>
+
+                <!-- play controls -->
+                <div style="float:left">
+                    &nbsp;
+                    <button class="mediaButton" type="button" id="playButton">&#x23F5;</button>
+                    <button class="mediaButton" type="button" id="pauseButton" disabled>&#x23F8;</button>
+                    <button class="mediaButton" type="button" id="stopButton" disabled>&#x23F9;</button>
+                </div>
+            </div>
+
+            <!-- Parameters row -->
+            <div style="float:left; display:block; width:100%">
+                &nbsp;display
+                <input type="text" id="displayFreqMin" value="" size="5" /> Hz to
+                <input type="text" id="displayFreqMax" value="" size="5" /> Hz
+
+                &nbsp;FFT cross-sample smoothing:
+                <select id="smoothingSelect">
+                    <option value="0.0">0.0 (none)</option>
+                    <option value="0.1">0.1</option>
+                    <option value="0.2">0.2</option>
+                    <option value="0.3">0.3</option>
+                    <option value="0.4">0.4</option>
+                    <option value="0.5">0.5</option>
+                    <option value="0.6">0.6</option>
+                    <option value="0.7">0.7</option>
+                    <option value="0.8">0.8</option>
+                    <option value="0.9">0.9</option>
+                    <option value="0.99">0.99 (lots)</option>
+                </select>
+            </div>
         </div>
 
         <br />
