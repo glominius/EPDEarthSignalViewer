@@ -32,6 +32,9 @@ canvas {
 
 select, input {
     font-size: 16px;
+    border-radius: 6px;
+    color: #000000;
+    text-align: center;
 }
 
 #fileLocal {
@@ -64,4 +67,5 @@ button:active {
 :root {
   --uiBg: #808080;
   --controlsBg: #707070;
+  --controlsFieldBg: #808080;
 }

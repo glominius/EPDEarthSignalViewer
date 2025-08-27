@@ -38,12 +38,28 @@ let audioSourceIsFile = false;
 let fileDecodedBuffer;
 let smoothingSelectEl;
 let updateParameter = false;
+let fftBinsSelectEl;
+let frequencyBinCount;
+const MaxFFTBins = 1024;
 
 
 // Graphics update routine called frequently.
 function processAudio() {
     if (paused)
         return;
+
+    // HTML select may have requested a change in number of FFT bins.
+    if (analyserNode.frequencyBinCount != frequencyBinCount) {
+        analyserNode.fftSize = 2 * frequencyBinCount;
+
+        // Clear waterfall.
+        canvasWaterfallCtx.fillStyle = "black";
+        canvasWaterfallCtx.fillRect(0, 0, canvasWaterfallEl.width, canvasWaterfallEl.height);
+
+        // Recalculate axes and redraw.
+        createSpectrumAxes();
+        }
+
     analyserNode.getFloatFrequencyData(sampleArray);
     const canvasWidth = canvasSpectrumEl.width;
     const canvasHeight = canvasSpectrumEl.height;
@@ -60,6 +76,7 @@ function processAudio() {
 
         const bins = analyserNode.frequencyBinCount;
         const barWidth = 1;
+        const blitWidth = Math.min(canvasWaterfallWidth, yAxisX + yAxisDataMargin + (bins-1)*(barWidth+1)); // Maximum X value needed.
 
         // Waterfall scroll step 1: blit on-screen minus oldest row to off-screen.
         // drawImage usage:
@@ -67,9 +84,9 @@ function processAudio() {
         //     drawImage(image, dx, dy, dWidth, dHeight)
         //     drawImage(image, sx, sy, sWidth, sHeight, dx, dy, dWidth, dHeight)
         if (waterfallScrollUp)
-            bufferCanvasWaterfallCtx.drawImage(canvasWaterfallEl, 0, 1, canvasWaterfallWidth, canvasWaterfallHeight-1, 0, 0, canvasWaterfallWidth, canvasWaterfallHeight-1);
+            bufferCanvasWaterfallCtx.drawImage(canvasWaterfallEl, 0, 1, blitWidth, canvasWaterfallHeight-1, 0, 0, blitWidth, canvasWaterfallHeight-1);
         else
-            bufferCanvasWaterfallCtx.drawImage(canvasWaterfallEl, 0, 0, canvasWaterfallWidth, canvasWaterfallHeight-1, 0, 1, canvasWaterfallWidth, canvasWaterfallHeight-1);
+            bufferCanvasWaterfallCtx.drawImage(canvasWaterfallEl, 0, 0, blitWidth, canvasWaterfallHeight-1, 0, 1, blitWidth, canvasWaterfallHeight-1);
 
         for (let i=0; i < bins; i++) {
             // === Spectrum analysis view ===
@@ -97,7 +114,7 @@ function processAudio() {
         }
 
         // Waterfall scroll step 3: blit off-screen to on-screen.
-        canvasWaterfallCtx.drawImage(bufferCanvasWaterfallEl, 0, 0, canvasWaterfallWidth, canvasWaterfallHeight, 0, 0, canvasWaterfallWidth, canvasWaterfallHeight);
+        canvasWaterfallCtx.drawImage(bufferCanvasWaterfallEl, 0, 0, blitWidth, canvasWaterfallHeight, 0, 0, blitWidth, canvasWaterfallHeight);
     });
 }
 
@@ -135,13 +152,12 @@ function constructAudioPipeline() {
     }
 
     analyserNode = new AnalyserNode(audioCtx);
-    analyserNode.fftSize = 2048;
+    analyserNode.fftSize = 2 * parseInt(fftBinsSelectEl.value);
     analyserNode.smoothingTimeConstant = Number(smoothingSelectEl.value);
-    sampleArray = new Float32Array(analyserNode.frequencyBinCount); // Half the size of fftSize.
     createSpectrumAxes();
     const numInputChannels = 1;
     const numOutputChannels = 1;
-    javascriptNode = audioCtx.createScriptProcessor(analyserNode.frequencyBinCount, numInputChannels, numOutputChannels);
+    javascriptNode = audioCtx.createScriptProcessor(Math.max(analyserNode.fftSize, 256), numInputChannels, numOutputChannels);
 
     //const gainNode = audioCtx.createGain();
     //gainNode.gain.value = 1;
@@ -161,6 +177,10 @@ function createColorMap() {
 }
 
 function createSpectrumAxes() {
+    // Clear canvas (could have been drawn with different params prior).
+    canvasSpectrumCtx.fillStyle = uiBg;
+    canvasSpectrumCtx.fillRect(0, 0, canvasSpectrumEl.width, canvasSpectrumEl.height); // Clear canvas.
+
     //const minDecibels = analyserNode.minDecibels;
     //const maxDecibels = analyserNode.maxDecibels;
     canvasSpectrumCtx.lineWidth = 1;
@@ -339,6 +359,7 @@ function main() {
     let feed = "stream";
 
     smoothingSelectEl = document.querySelector("#smoothingSelect");
+    fftBinsSelectEl = document.querySelector("#fftBinsSelect");
 
     audioCtx = new AudioContext();
 
@@ -414,10 +435,16 @@ function main() {
         playbackStopped();
     });
 
-    smoothingSelectEl.addEventListener('change', function (e) {
+    smoothingSelectEl.addEventListener('change', function(e) {
         if (analyserNode)
             analyserNode.smoothingTimeConstant = Number(smoothingSelectEl.value);
-    })
+    });
+
+    frequencyBinCount = parseInt(fftBinsSelectEl.value); // Start with default value.
+    sampleArray = new Float32Array(MaxFFTBins); // Preallocate for maximum sample size.
+    fftBinsSelectEl.addEventListener('change', function(e) {
+        frequencyBinCount = parseInt(fftBinsSelectEl.value);
+    });
 }
 
 document.addEventListener('DOMContentLoaded', () => main());
