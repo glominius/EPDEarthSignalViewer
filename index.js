@@ -41,6 +41,12 @@ let updateParameter = false;
 let fftBinsSelectEl;
 let frequencyBinCount;
 const MaxFFTBins = 1024;
+let minDbEl;
+let maxDbEl;
+let minDb = -100;
+let maxDb = -30;
+const MIN_DB = -100;
+const MAX_DB = -10;
 
 
 // Graphics update routine called frequently.
@@ -48,6 +54,7 @@ function processAudio() {
     if (paused)
         return;
 
+    let updateAxes = false;
     // HTML select may have requested a change in number of FFT bins.
     if (analyserNode.frequencyBinCount != frequencyBinCount) {
         analyserNode.fftSize = 2 * frequencyBinCount;
@@ -57,8 +64,20 @@ function processAudio() {
         canvasWaterfallCtx.fillRect(0, 0, canvasWaterfallEl.width, canvasWaterfallEl.height);
 
         // Recalculate axes and redraw.
+        updateAxes = true;
+    }
+
+    if (minDb != analyserNode.minDecibels) {
+        analyserNode.minDecibels = minDb;
+        updateAxes = true;
+    }
+    if (maxDb != analyserNode.maxDecibels) {
+        analyserNode.maxDecibels = maxDb;
+        updateAxes = true;
+    }
+
+    if (updateAxes)
         createSpectrumAxes();
-        }
 
     analyserNode.getFloatFrequencyData(sampleArray);
     const canvasWidth = canvasSpectrumEl.width;
@@ -162,10 +181,17 @@ function constructAudioPipeline() {
     //const gainNode = audioCtx.createGain();
     //gainNode.gain.value = 1;
 
-    audioSourceNode.connect(audioCtx.destination);
     audioSourceNode.connect(analyserNode);
-    analyserNode.connect(javascriptNode);
     analyserNode.connect(audioCtx.destination);
+    // const highpassFilter = audioCtx.createBiquadFilter();
+    // highpassFilter.type = "highpass";
+    // highpassFilter.Q.value = 4;
+    // highpassFilter.frequency.value = 60;
+    // audioSourceNode.connect(highpassFilter);
+    // highpassFilter.connect(analyserNode);
+    // analyserNode.connect(audioCtx.destination);
+
+    analyserNode.connect(javascriptNode);
     javascriptNode.connect(audioCtx.destination);
     javascriptNode.onaudioprocess = () => { processAudio() };
     if (audioSourceIsFile)
@@ -181,8 +207,6 @@ function createSpectrumAxes() {
     canvasSpectrumCtx.fillStyle = uiBg;
     canvasSpectrumCtx.fillRect(0, 0, canvasSpectrumEl.width, canvasSpectrumEl.height); // Clear canvas.
 
-    //const minDecibels = analyserNode.minDecibels;
-    //const maxDecibels = analyserNode.maxDecibels;
     canvasSpectrumCtx.lineWidth = 1;
     canvasSpectrumCtx.strokeStyle = "black";
     canvasSpectrumCtx.fillStyle = "black";
@@ -230,12 +254,10 @@ function createSpectrumAxes() {
 
     // X axis ticks / labels.
     const bins = analyserNode.frequencyBinCount;
-    const binBandwidth = audioCtx.sampleRate / bins;
+    const binBandwidth = (audioCtx.sampleRate / 2) / bins;
     const displayBandwidth = displayFreqMax - displayFreqMin;
     let xAxisInterval;
-    if (displayBandwidth >= 44100)
-        xAxisInterval = 1000;
-    else if (displayBandwidth >= 22050)
+    if (displayBandwidth >= 22050)
         xAxisInterval = 500;
     else if (displayBandwidth >= 11025)
         xAxisInterval = 250;
@@ -360,6 +382,10 @@ function main() {
 
     smoothingSelectEl = document.querySelector("#smoothingSelect");
     fftBinsSelectEl = document.querySelector("#fftBinsSelect");
+    minDbEl = document.querySelector("#minDb");
+    maxDbEl = document.querySelector("#maxDb");
+    minDbEl.value = minDb.toString();
+    maxDbEl.value = maxDb.toString();
 
     audioCtx = new AudioContext();
 
@@ -444,6 +470,26 @@ function main() {
     sampleArray = new Float32Array(MaxFFTBins); // Preallocate for maximum sample size.
     fftBinsSelectEl.addEventListener('change', function(e) {
         frequencyBinCount = parseInt(fftBinsSelectEl.value);
+    });
+
+    const numberRe = /^[+-]{0,1}\d+([.]\d+){0,1}$/; // Match integer or basic floating point.
+    minDbEl.addEventListener('change', function(e) {
+        const val = minDbEl.value;
+        const dB = Number(minDbEl.value);
+        if (numberRe.test(val) && (dB < maxDb) && (dB >= MIN_DB)) {
+            minDb = dB;
+        } else {
+            minDbEl.value = minDb.toString(); // Reset to last known good value.
+        }
+    });
+    maxDbEl.addEventListener('change', function(e) {
+        const val = maxDbEl.value;
+        const dB = Number(maxDbEl.value);
+        if (numberRe.test(val) && (dB > minDb) && (dB <= MAX_DB)) {
+            maxDb = dB;
+        } else {
+            maxDbEl.value = maxDb.toString(); // Reset to last known good value.
+        }
     });
 }
 

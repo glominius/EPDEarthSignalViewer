@@ -26,7 +26,7 @@
 
                     <!-- stream info (when selected) -->
                     <div id="feedStream" style="display:inline-block">
-                        &nbsp;url:
+                        &nbsp;url
                         <input type="url" id="streamURL" value="" size="50" />
                     </div>
 
@@ -51,7 +51,7 @@
                 <input type="text" id="displayFreqMin" value="" size="5" /> Hz to
                 <input type="text" id="displayFreqMax" value="" size="5" /> Hz
 
-                &nbsp;FFT cross-sample smoothing:
+                &nbsp;FFT cross-sample smoothing
                 <select id="smoothingSelect">
                     <option value="0.0">0.0 (none)</option>
                     <option value="0.1">0.1</option>
@@ -65,7 +65,7 @@
                     <option value="0.9">0.9</option>
                     <option value="0.99">0.99 (lots)</option>
                 </select>
-                &nbsp;FFT bins:
+                &nbsp;FFT bins
                 <select id="fftBinsSelect">
                     <option value="16">16</option>
                     <option value="32">32</option>
@@ -75,6 +75,10 @@
                     <option value="512">512</option>
                     <option selected value="1024">1024</option>
                 </select>
+                &nbsp;min
+                <input type="text" id="minDb" value="" size=5 title="100 <= min < max" /> dB
+                &nbsp;max
+                <input type="text" id="maxDb" value="" size=5 title="min < max <= -10" /> dB
             </div>
         </div>
 
