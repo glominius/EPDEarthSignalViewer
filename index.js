@@ -47,6 +47,8 @@ let minDb = -100;
 let maxDb = -30;
 const MIN_DB = -100;
 const MAX_DB = -10;
+const barWidth = 2;
+const barSpacing = 0;
 
 
 // Graphics update routine called frequently.
@@ -94,8 +96,7 @@ function processAudio() {
         canvasSpectrumCtx.fillRect(yAxisX+1, 0, canvasWidth - (yAxisX+1), canvasHeight - (xAxisY + xAxisDataMargin)); // Clear canvas.
 
         const bins = analyserNode.frequencyBinCount;
-        const barWidth = 1;
-        const blitWidth = Math.min(canvasWaterfallWidth, yAxisX + yAxisDataMargin + (bins-1)*(barWidth+1)); // Maximum X value needed.
+        const blitWidth = Math.min(canvasWaterfallWidth, yAxisX + yAxisDataMargin + (bins-1)*(barWidth+barSpacing)); // Maximum X value needed.
 
         // Waterfall scroll step 1: blit on-screen minus oldest row to off-screen.
         // drawImage usage:
@@ -111,7 +112,7 @@ function processAudio() {
             // === Spectrum analysis view ===
             // x,y is the upper left point of the rectangle.
             const v = (sampleArray[i] >= minDecibels) ? sampleArray[i] : minDecibels;
-            const x = yAxisX + yAxisDataMargin + i*(barWidth+1);
+            const x = yAxisX + yAxisDataMargin + i*(barWidth+barSpacing);
             const ratio = (v - minDecibels) / rangeDecibels;
             // const oneMinusRatio = 1.0 - ratio;
             const height = ratio * (canvasHeight - (xAxisY + xAxisDataMargin));
@@ -121,15 +122,15 @@ function processAudio() {
                 r = 255;
             const fillStyle = colorMap[r];
             canvasSpectrumCtx.fillStyle = fillStyle;
-            canvasSpectrumCtx.fillRect(x+0.5, y+0.5, barWidth, height);
+            canvasSpectrumCtx.fillRect(x, y, barWidth, height);
 
             // === Watervall view ===
             // Waterfall scroll step 2: update latest row off-screen.
             bufferCanvasWaterfallCtx.fillStyle = fillStyle;
             if (waterfallScrollUp)
-                bufferCanvasWaterfallCtx.fillRect(x + 0.5, canvasWaterfallHeight-1, barWidth, 1);
+                bufferCanvasWaterfallCtx.fillRect(x, canvasWaterfallHeight-1, barWidth, 1);
             else
-                bufferCanvasWaterfallCtx.fillRect(x + 0.5, 0, barWidth, 1);
+                bufferCanvasWaterfallCtx.fillRect(x, 0, barWidth, 1);
         }
 
         // Waterfall scroll step 3: blit off-screen to on-screen.
@@ -186,7 +187,7 @@ function constructAudioPipeline() {
     // const highpassFilter = audioCtx.createBiquadFilter();
     // highpassFilter.type = "highpass";
     // highpassFilter.Q.value = 4;
-    // highpassFilter.frequency.value = 60;
+    // highpassFilter.frequency.value = 2000;
     // audioSourceNode.connect(highpassFilter);
     // highpassFilter.connect(analyserNode);
     // analyserNode.connect(audioCtx.destination);
@@ -255,24 +256,7 @@ function createSpectrumAxes() {
     // X axis ticks / labels.
     const bins = analyserNode.frequencyBinCount;
     const binBandwidth = (audioCtx.sampleRate / 2) / bins;
-    const displayBandwidth = displayFreqMax - displayFreqMin;
-    let xAxisInterval;
-    if (displayBandwidth >= 22050)
-        xAxisInterval = 500;
-    else if (displayBandwidth >= 11025)
-        xAxisInterval = 250;
-    else if (displayBandwidth >= 5500)
-        xAxisInterval = 125;
-    else if (displayBandwidth >= 2750)
-        xAxisInterval = 50;
-    else if (displayBandwidth >= 1375)
-        xAxisInterval = 25;
-    else if (displayBandwidth >= 700)
-        xAxisInterval = 10;
-    else if (displayBandwidth >= 350)
-        xAxisInterval = 5;
-    else
-        xAxisInterval = 2;
+    //const displayBandwidth = displayFreqMax - displayFreqMin;
 
     const tickEveryNBins = 25;
     const barWidth = 1;
@@ -371,7 +355,7 @@ function main() {
     displayFreqMinEl.value = "0";
     displayFreqMinEl.disabled = true;
     displayFreqMaxEl = document.querySelector("#displayFreqMax");
-    displayFreqMaxEl.value = "44100";
+    displayFreqMaxEl.value = "0";
     displayFreqMaxEl.disabled = true;
 
     sourceSelectEl = document.querySelector("#sourceSelect");
@@ -388,6 +372,7 @@ function main() {
     maxDbEl.value = maxDb.toString();
 
     audioCtx = new AudioContext();
+    displayFreqMaxEl.value = Math.round(audioCtx.sampleRate / 2).toString();
 
     sourceSelectEl.addEventListener('change', function (e) {
         const val = e.target.value;
