@@ -1,7 +1,21 @@
 'use strict';
 
+import { FFT } from "./fft_js/fft.js";
+
+const barWidth = 2;
+const barSpacing = 0;
+const yAxisX = 25;
+const xAxisY = 20;
+const yAxisDataMargin = 5;
+const xAxisDataMargin = 2;
+const tickLength = 4;
+const labelMargin = 2;
+
+const nemMinWindowSize = 10; // Arbitrary.
+
 let audioCtx;
-let analyserNode;
+let splitterNode;
+let audioSourceNode;
 let playButton;
 let pauseButton;
 let stopButton;
@@ -14,8 +28,7 @@ let bufferCanvasWaterfallEl;
 let bufferCanvasWaterfallCtx;
 let waterfallScrollUp = false;
 let audioStreamEl;
-let audioSourceNode;
-let javascriptNode;
+//let javascriptNode;
 let streamURL = "http://hakasays.com:8443/EPDAntennaField";
 let streamURLEl;
 let displayFreqMinEl;
@@ -23,17 +36,13 @@ let displayFreqMaxEl;
 let displayFreqMin;
 let displayFreqMax;
 let colorMap;
+let colorMapNem;
 let uiBg;
 let fileLocalEl;
 let paused = false;
+let stopped = true;
 let sourceSelectEl;
 let mediaElementSrc;
-const yAxisX = 25;
-const xAxisY = 20;
-const yAxisDataMargin = 5;
-const xAxisDataMargin = 2;
-const tickLength = 4;
-const labelMargin = 2;
 let audioSourceIsFile = false;
 let fileDecodedBuffer;
 let smoothingSelectEl;
@@ -47,18 +56,44 @@ let minDb = -100;
 let maxDb = -30;
 const MIN_DB = -100;
 const MAX_DB = -10;
-const barWidth = 2;
-const barSpacing = 0;
+let cursorInfoEl;
+let nemSamples;
+let denemWindowEl;
+let denemDeviationAvgMaxEl;
+let denemAvgMinEl;
+let denemNode;
 
+let fft; // Instance of FFT().
+let fftOut; // FFT complex outputs.
+let fftAmpDb; // FFT outputs processed to only magnitude in dB.
+
+
+function spectrumMouseMove(x, y) {
+    const x0 = yAxisX + yAxisDataMargin; // Minimum X for a frequency bar.
+    if (x >= x0) {
+        const bin = Math.trunc((x - x0) / (barWidth+barSpacing));
+        const bins = frequencyBinCount;
+        const maxFreq = audioCtx.sampleRate / 2;
+        const binBandwidth = maxFreq / bins;
+        const freq = bin * binBandwidth;
+        if (freq <= maxFreq)
+            cursorInfoEl.value = Math.round(freq).toString() + "Hz";
+        else
+            cursorInfoEl.value = "";
+    } else {
+        cursorInfoEl.value = "";
+    }
+}
 
 // Graphics update routine called frequently.
-function processAudio() {
-    if (paused)
+function processAudio(fftAmpDb, nemTriggered) {
+    if (paused || stopped)
         return;
 
     let updateAxes = false;
     // HTML select may have requested a change in number of FFT bins.
-    if (analyserNode.frequencyBinCount != frequencyBinCount) {
+// FIXME: update fft
+if (false && analyserNode.frequencyBinCount != frequencyBinCount) {
         analyserNode.fftSize = 2 * frequencyBinCount;
 
         // Clear waterfall.
@@ -69,33 +104,35 @@ function processAudio() {
         updateAxes = true;
     }
 
-    if (minDb != analyserNode.minDecibels) {
-        analyserNode.minDecibels = minDb;
-        updateAxes = true;
-    }
-    if (maxDb != analyserNode.maxDecibels) {
-        analyserNode.maxDecibels = maxDb;
-        updateAxes = true;
-    }
+    //if (minDb != analyserNode.minDecibels) {
+    //    analyserNode.minDecibels = minDb;
+    //    updateAxes = true;
+    //}
+    //if (maxDb != analyserNode.maxDecibels) {
+    //    analyserNode.maxDecibels = maxDb;
+    //    updateAxes = true;
+    //}
 
     if (updateAxes)
         createSpectrumAxes();
 
-    analyserNode.getFloatFrequencyData(sampleArray);
+    //analyserNode.getFloatFrequencyData(sampleArray);
+    //analyserNode.getFloatTimeDomainData(sampleArray);
     const canvasWidth = canvasSpectrumEl.width;
     const canvasHeight = canvasSpectrumEl.height;
     const canvasWaterfallWidth = canvasWaterfallEl.width;
     const canvasWaterfallHeight = canvasWaterfallEl.height;
-    const minDecibels = analyserNode.minDecibels;
-    const maxDecibels = analyserNode.maxDecibels;
+    const minDecibels = minDb;
+    const maxDecibels = maxDb;
     const rangeDecibels = maxDecibels - minDecibels;
+
 
     // Display graphics when browswer is ready to draw.
     requestAnimationFrame(() => {
         canvasSpectrumCtx.fillStyle = uiBg;
         canvasSpectrumCtx.fillRect(yAxisX+1, 0, canvasWidth - (yAxisX+1), canvasHeight - (xAxisY + xAxisDataMargin)); // Clear canvas.
 
-        const bins = analyserNode.frequencyBinCount;
+        const bins = frequencyBinCount;
         const blitWidth = Math.min(canvasWaterfallWidth, yAxisX + yAxisDataMargin + (bins-1)*(barWidth+barSpacing)); // Maximum X value needed.
 
         // Waterfall scroll step 1: blit on-screen minus oldest row to off-screen.
@@ -108,19 +145,21 @@ function processAudio() {
         else
             bufferCanvasWaterfallCtx.drawImage(canvasWaterfallEl, 0, 0, blitWidth, canvasWaterfallHeight-1, 0, 1, blitWidth, canvasWaterfallHeight-1);
 
+// FIXME: clear nemBin/nemSamples upon #bins change.
         for (let i=0; i < bins; i++) {
+            const sampleDb = Math.max(fftAmpDb[i], minDecibels);
             // === Spectrum analysis view ===
             // x,y is the upper left point of the rectangle.
-            const v = (sampleArray[i] >= minDecibels) ? sampleArray[i] : minDecibels;
             const x = yAxisX + yAxisDataMargin + i*(barWidth+barSpacing);
-            const ratio = (v - minDecibels) / rangeDecibels;
+            const ratio = (sampleDb - minDecibels) / rangeDecibels;
             // const oneMinusRatio = 1.0 - ratio;
             const height = ratio * (canvasHeight - (xAxisY + xAxisDataMargin));
             const y = canvasSpectrumEl.height - (xAxisY + xAxisDataMargin + height);
-            let r = Math.round(ratio * 255);
-            if (r > 255)
-                r = 255;
-            const fillStyle = colorMap[r];
+            let fillStyle;
+            let intensity = Math.round(ratio * 255);
+            if (intensity > 255)
+                intensity = 255;
+            fillStyle = (nemTriggered[i]>0) ? colorMapNem[intensity] : colorMap[intensity];
             canvasSpectrumCtx.fillStyle = fillStyle;
             canvasSpectrumCtx.fillRect(x, y, barWidth, height);
 
@@ -142,13 +181,21 @@ function constructAudioPipeline() {
     displayFreqMin = parseInt(displayFreqMinEl.value);
     displayFreqMax = parseInt(displayFreqMaxEl.value);
 
+// FIXME: resize following on change of frequencyBinCount
+    sampleArray = new Float32Array(frequencyBinCount*2);
+    fft = new FFT(frequencyBinCount*2); // Instance.
+    fftOut = fft.createComplexArray(); // Complex outputs [real, imag, real, imag, ...]
+    fftAmpDb = Array(frequencyBinCount).fill(0); // Output bins processed into dB.
+
     // Disconnect previously created nodes.
-    if (analyserNode)
-        analyserNode.disconnect();
-    if (javascriptNode)
-        javascriptNode.disconnect();
+    //if (javascriptNode)
+    //    javascriptNode.disconnect();
     if (audioSourceNode)
         audioSourceNode.disconnect();
+    if (splitterNode)
+        splitterNode.disconnect();
+    if (denemNode)
+        denemNode.disconnect();
 
     if (audioSourceIsFile) { // File.
         // Create a buffer source node from previously decoded file.
@@ -171,36 +218,20 @@ function constructAudioPipeline() {
         audioCtx.resume();
     }
 
-    analyserNode = new AnalyserNode(audioCtx);
-    analyserNode.fftSize = 2 * parseInt(fftBinsSelectEl.value);
-    analyserNode.smoothingTimeConstant = Number(smoothingSelectEl.value);
+    splitterNode = audioCtx.createChannelSplitter(1);
     createSpectrumAxes();
-    const numInputChannels = 1;
-    const numOutputChannels = 1;
-    javascriptNode = audioCtx.createScriptProcessor(Math.max(analyserNode.fftSize, 256), numInputChannels, numOutputChannels);
 
-    //const gainNode = audioCtx.createGain();
-    //gainNode.gain.value = 1;
+    audioSourceNode.connect(splitterNode);
+    splitterNode.connect(denemNode);
+    denemNode.connect(audioCtx.destination);
 
-    audioSourceNode.connect(analyserNode);
-    analyserNode.connect(audioCtx.destination);
-    // const highpassFilter = audioCtx.createBiquadFilter();
-    // highpassFilter.type = "highpass";
-    // highpassFilter.Q.value = 4;
-    // highpassFilter.frequency.value = 2000;
-    // audioSourceNode.connect(highpassFilter);
-    // highpassFilter.connect(analyserNode);
-    // analyserNode.connect(audioCtx.destination);
-
-    analyserNode.connect(javascriptNode);
-    javascriptNode.connect(audioCtx.destination);
-    javascriptNode.onaudioprocess = () => { processAudio() };
     if (audioSourceIsFile)
         audioSourceNode.start(0); // Play the sound file.
 }
 
 function createColorMap() {
     colorMap = Array.from(Array(256), (_, i) => `rgb(${i} 0 0)`);
+    colorMapNem = Array.from(Array(256), (_, i) => `rgb(0 ${i} 0)`);
 }
 
 function createSpectrumAxes() {
@@ -221,7 +252,7 @@ function createSpectrumAxes() {
     canvasSpectrumCtx.stroke();
 
     // Y axis ticks / labels.
-    const decibelRange = analyserNode.maxDecibels - analyserNode.minDecibels;
+    const decibelRange = maxDb - minDb;
     let yAxisInterval;
     if (decibelRange <= 10)
         yAxisInterval = 1;
@@ -233,12 +264,12 @@ function createSpectrumAxes() {
         yAxisInterval = 8;
     else
         yAxisInterval = 10;
-    const interval0 = Math.ceil(analyserNode.minDecibels / yAxisInterval) * yAxisInterval;
+    const interval0 = Math.ceil(minDb / yAxisInterval) * yAxisInterval;
     canvasSpectrumCtx.font = "12px trebuchet ms";
     canvasSpectrumCtx.textAlign = "right";
     canvasSpectrumCtx.textBaseline = "middle";
-    for (let interval = interval0; interval <= analyserNode.maxDecibels; interval += yAxisInterval) {
-        const y = ((interval - analyserNode.minDecibels) / decibelRange) * yAxisHeight;
+    for (let interval = interval0; interval <= maxDb; interval += yAxisInterval) {
+        const y = ((interval - minDb) / decibelRange) * yAxisHeight;
         const yCanvas = canvasSpectrumEl.height - (xAxisY + y);
         canvasSpectrumCtx.beginPath();
         canvasSpectrumCtx.moveTo(yAxisX, yCanvas);
@@ -254,7 +285,7 @@ function createSpectrumAxes() {
     canvasSpectrumCtx.stroke();
 
     // X axis ticks / labels.
-    const bins = analyserNode.frequencyBinCount;
+    const bins = frequencyBinCount;
     const binBandwidth = (audioCtx.sampleRate / 2) / bins;
     //const displayBandwidth = displayFreqMax - displayFreqMin;
 
@@ -301,6 +332,7 @@ function setupLocalFileListener() {
 
 // Housekeeping for when playback stops.
 function playbackStopped() {
+    stopped = true;
     pauseButton.disabled = true;
     stopButton.disabled = true;
     sourceSelectEl.disabled = false; // Enable source selects.
@@ -313,7 +345,6 @@ function playbackStopped() {
         fileLocalEl.disabled = true; // Disable file select.
     }
     fileLocalEl.value = ""; // Prevent caching in case it's reloaded.
-    javascriptNode.onaudioprocess = () => { };
 }
 
 function main() {
@@ -371,7 +402,20 @@ function main() {
     minDbEl.value = minDb.toString();
     maxDbEl.value = maxDb.toString();
 
-    audioCtx = new AudioContext();
+    cursorInfoEl = document.querySelector("#cursorInfo");
+
+    denemWindowEl = document.querySelector("#denemWindow");
+    let param = denemNode.parameters.get("windowSize");
+    denemWindowEl.value = param.value.toString();
+
+    denemDeviationAvgMaxEl = document.querySelector("#denemDeviationAvgMax");
+    param = denemNode.parameters.get("ampDeviationAvgMax");
+    denemDeviationAvgMaxEl.value = param.value.toString();
+
+    denemAvgMinEl = document.querySelector("#denemAvgMin");
+    param = denemNode.parameters.get("ampAvgMin");
+    denemAvgMinEl.value = param.value.toString();
+
     displayFreqMaxEl.value = Math.round(audioCtx.sampleRate / 2).toString();
 
     sourceSelectEl.addEventListener('change', function (e) {
@@ -415,6 +459,7 @@ function main() {
             audioStreamEl.src = url;
             audioStreamEl.play();
         }
+        stopped = false;
         constructAudioPipeline();
     });
 
@@ -446,22 +491,23 @@ function main() {
         playbackStopped();
     });
 
-    smoothingSelectEl.addEventListener('change', function(e) {
-        if (analyserNode)
-            analyserNode.smoothingTimeConstant = Number(smoothingSelectEl.value);
-    });
+    //smoothingSelectEl.addEventListener('change', function(e) {
+    //    if (analyserNode)
+    //        analyserNode.smoothingTimeConstant = Number(smoothingSelectEl.value);
+    //});
 
     frequencyBinCount = parseInt(fftBinsSelectEl.value); // Start with default value.
-    sampleArray = new Float32Array(MaxFFTBins); // Preallocate for maximum sample size.
     fftBinsSelectEl.addEventListener('change', function(e) {
         frequencyBinCount = parseInt(fftBinsSelectEl.value);
     });
 
-    const numberRe = /^[+-]{0,1}\d+([.]\d+){0,1}$/; // Match integer or basic floating point.
+    const numRe = /^[+-]{0,1}\d+([.]\d+){0,1}$/; // Match integer or basic floating point.
+    const posNumRe = /^[1-9][0-9]*([.]\d+){0,1}$/; // Match positive integer or basic floating point.
+    const posIntRe = /^[1-9][0-9]*$/; // Match positive integer.
     minDbEl.addEventListener('change', function(e) {
         const val = minDbEl.value;
         const dB = Number(minDbEl.value);
-        if (numberRe.test(val) && (dB < maxDb) && (dB >= MIN_DB)) {
+        if (numRe.test(val) && (dB < maxDb) && (dB >= MIN_DB)) {
             minDb = dB;
         } else {
             minDbEl.value = minDb.toString(); // Reset to last known good value.
@@ -469,13 +515,65 @@ function main() {
     });
     maxDbEl.addEventListener('change', function(e) {
         const val = maxDbEl.value;
-        const dB = Number(maxDbEl.value);
-        if (numberRe.test(val) && (dB > minDb) && (dB <= MAX_DB)) {
+        const dB = Number(val);
+        if (numRe.test(val) && (dB > minDb) && (dB <= MAX_DB)) {
             maxDb = dB;
         } else {
             maxDbEl.value = maxDb.toString(); // Reset to last known good value.
         }
     });
+
+    canvasSpectrumEl.addEventListener('mousemove', event => {
+        spectrumMouseMove(event.offsetX, event.offsetY);
+    });
+    canvasSpectrumEl.addEventListener('mouseleave', event => {
+      cursorInfoEl.value = "";
+    });
+
+    denemWindowEl.addEventListener('change', function(e) {
+        const valStr = e.target.value;
+        const val = Number(valStr);
+        if (posIntRe.test(val) && (val >= nemMinWindowSize)) {
+            denemWindowSize = val;
+            const param = denemNode.parameters.get("windowSize");
+            param.value = denemWindowSize;
+        } else {
+            e.target.value = denemWindowSize.toString(); // Reset to last known good value.
+        }
+    });
+    denemDeviationAvgMaxEl.addEventListener('change', function(e) {
+        const valStr = e.target.value;
+        const val = Number(valStr);
+        if (posNumRe.test(val)) {
+            denemAmpDeviationAvgMax = val;
+            const param = denemNode.parameters.get("ampDeviationAvgMax");
+            param.value = denemAmpDeviationAvgMax;
+        } else {
+            e.target.value = denemAmpDeviationAvgMax.toString(); // Reset to last known good value.
+        }
+    });
+    denemAvgMinEl.addEventListener('change', function(e) {
+        const valStr = e.target.value;
+        const val = Number(valStr);
+        if (numRe.test(val) && (val >= minDb) && (val <= maxDb)) {
+            denemAmpAvgMin = val;
+            const param = denemNode.parameters.get("ampAvgMin");
+            param.value = denemAmpAvgMin;
+        } else {
+            e.target.value = denemAmpAvgMin.toString(); // Reset to last known good value.
+        }
+    });
+
+    denemNode.port.onmessage = (e) => {
+        //console.log("msg", e.data.spectrum);
+        processAudio(e.data.fftAmpDb, e.data.nemTriggered);
+    };
 }
 
-document.addEventListener('DOMContentLoaded', () => main());
+document.addEventListener('DOMContentLoaded', () => {
+    audioCtx = new AudioContext();
+    audioCtx.audioWorklet.addModule("denem.js").then((x) => {
+        denemNode = new AudioWorkletNode(audioCtx, "denem");
+        main();
+        });
+    });

@@ -22,7 +22,10 @@ Use either of 2 methods by pulling down on the green `Code` lozenge:
 - `Download ZIP` and extract the zip file
 - Use `git clone` (for the real techies)
 
-In either case, point your web browser at the main directory (should have a file index.html in it).
+You will need a lightweight web server (due to restrictions imposed by the browser).  Any should do, but if you have python:
+- `cd <directory you extracted to>`
+- `python3 -m http.server`
+- Point your browser at index.html in the directory you extracted.
 
 ## TBD
 

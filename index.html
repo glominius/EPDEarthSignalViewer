@@ -52,7 +52,7 @@
                 <input type="text" id="displayFreqMax" value="" size="5" /> Hz
 
                 &nbsp;FFT cross-sample smoothing
-                <select id="smoothingSelect">
+                <select id="smoothingSelect" disabled>
                     <option value="0.0">0.0 (none)</option>
                     <option value="0.1">0.1</option>
                     <option value="0.2">0.2</option>
@@ -66,7 +66,7 @@
                     <option value="0.99">0.99 (lots)</option>
                 </select>
                 &nbsp;FFT bins
-                <select id="fftBinsSelect">
+                <select id="fftBinsSelect" disabled>
                     <option value="16">16</option>
                     <option value="32">32</option>
                     <option value="64">64</option>
@@ -76,9 +76,18 @@
                     <option selected value="1024">1024</option>
                 </select>
                 &nbsp;min
-                <input type="text" id="minDb" value="" size=5 title="100 <= min < max" /> dB
+                <input type="text" id="minDb" value="" size=5 title="100 <= min < max" disabled /> dB
                 &nbsp;max
-                <input type="text" id="maxDb" value="" size=5 title="min < max <= -10" /> dB
+                <input type="text" id="maxDb" value="" size=5 title="min < max <= -10" disabled /> dB
+                &nbsp;cursor
+                <input type="text" value="" id="cursorInfo" readonly size="8" />
+
+                &nbsp;Denem: window
+                <input type="text" value="" id="denemWindow" size="8" />
+                &nbsp;deviation
+                <input type="text" value="" id="denemDeviationAvgMax" size="8" /> dB
+                &nbsp;min
+                <input type="text" value="" id="denemAvgMin" size="8" /> dB
             </div>
         </div>
 
@@ -86,6 +95,7 @@
         <canvas id="spectrum" height="512"></canvas>
         <canvas id="waterfall" height="512"></canvas>
 
-        <script src="index.js"></script>
+        <script type="module" src="./fft_js/fft.js"></script>
+        <script type="module" src="index.js"></script>
     </body>
 </html>
