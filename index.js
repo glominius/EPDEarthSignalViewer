@@ -29,7 +29,7 @@ let bufferCanvasWaterfallCtx;
 let waterfallScrollUp = false;
 let audioStreamEl;
 //let javascriptNode;
-let streamURL = "http://hakasays.com:8443/EPDAntennaField";
+let streamURL = "https://hakasays.com:3448/EPDAntennaField";
 let streamURLEl;
 let displayFreqMinEl;
 let displayFreqMaxEl;
