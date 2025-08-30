@@ -1,9 +1,10 @@
 import { FFT } from "./fft_js/fft.js";
 
 const DefaultBinCount = 1024;
-const DefaultWindowSize = 30;
-const DefaultAmpDeviationAvgMax = 4;
-const DefaultAmpAvgMin = -74;
+const DefaultWindowSize = 20;
+const DefaultAmpDeviationAvgMax = 4.2;
+const DefaultAmpAvgMin = -72;
+const DefaultDwellTheshold = 0.5;
 
 class DenemProcessor extends AudioWorkletProcessor {
     constructor() {
@@ -34,6 +35,7 @@ class DenemProcessor extends AudioWorkletProcessor {
         for (const entry of this.nemHisto) {
             entry.ampSum = 0;
             entry.ampDeviationSum = 0;
+            entry.triggerDwell = 0; // Increment each sample triggered, decrement otherwise.
         }
         this.nemSamples = 0;
     }
@@ -52,6 +54,10 @@ class DenemProcessor extends AudioWorkletProcessor {
               name: "ampAvgMin",
               defaultValue: DefaultAmpAvgMin,
           },
+          {
+              name: "dwellThreshold",
+              defaultValue: DefaultDwellTheshold,
+          },
         ];
     }
 
@@ -59,6 +65,7 @@ class DenemProcessor extends AudioWorkletProcessor {
         const windowSize         = parameters.windowSize[0];
         const ampDeviationAvgMax = parameters.ampDeviationAvgMax[0];
         const ampAvgMin          = parameters.ampAvgMin[0];
+        const dwellThreshold     = parameters.dwellThreshold[0];
         if (windowSize != this.windowSizePrev) {
             this.clearNemHisto();
             this.windowSizePrev = windowSize;
@@ -110,7 +117,10 @@ class DenemProcessor extends AudioWorkletProcessor {
 
                 if (this.nemSamples >= windowSize) {
                     const ampDeviationAvg = nemBin.ampDeviationSum / windowSize;
-                    if ((ampAvg >= ampAvgMin) && (ampDeviationAvg <= ampDeviationAvgMax)) {
+                    const windowTrigger = (ampAvg >= ampAvgMin) && (ampDeviationAvg <= ampDeviationAvgMax);
+                    // const longTermTrigger = (nemBin.triggerDwell / (windowSize * 4)) >= dwellThreshold;
+                    const longTermTrigger = false;
+                    if (windowTrigger || longTermTrigger) {
                         // This bin has nem characteristics.
                         this.nemTriggered[bin] = 1; // True.
                         // Remove this frequency band.
@@ -118,12 +128,28 @@ class DenemProcessor extends AudioWorkletProcessor {
                         this.fftOut[bin*2+1] = 0;
                         this.fftOut[(this.sampleSize - bin)*2] = 0;
                         this.fftOut[(this.sampleSize - bin)*2 + 1] = 0;
+                        if (windowTrigger)
+                            nemBin.triggerDwell++; // Credit as a trigger.
+                        else
+                            nemBin.triggerDwell--; // Credit as a non-trigger.
+                    } {
+                        nemBin.triggerDwell--; // Credit as a non-trigger.
                     }
                     // Sliding window: effectively drop leading sample value for next iteration.
                     nemBin.ampSum = ampAvg * (windowSize - 1);
                     nemBin.ampDeviationSum = ampDeviationAvg * (windowSize - 1);
                 }
             }
+
+if (false)
+for (let bin=1; bin < 69; bin++) {
+    this.fftOut[bin*2] = 0;
+    this.fftOut[bin*2+1] = 0;
+    this.fftOut[(this.sampleSize - bin)*2] = 0;
+    this.fftOut[(this.sampleSize - bin)*2 + 1] = 0;
+    this.fftAmpDb[bin] = 0;
+}
+
             this.fftAmpDb[0] = -100; // Zero DC component.
             this.port.postMessage(this.portObj);
 

@@ -61,6 +61,7 @@ let nemSamples;
 let denemWindowEl;
 let denemDeviationAvgMaxEl;
 let denemAvgMinEl;
+//let denemDwellThresholdEl;
 let denemNode;
 
 let fft; // Instance of FFT().
@@ -379,7 +380,7 @@ function main() {
     createColorMap();
 
     streamURLEl = document.querySelector("#streamURL");
-    streamURLEl.setAttribute("value", streamURL + ".ogg");
+    streamURLEl.setAttribute("value", streamURL + ".mp3"); // Or ".ogg"
     audioStreamEl = document.querySelector("#audioStream");
 
     displayFreqMinEl = document.querySelector("#displayFreqMin");
@@ -410,11 +411,15 @@ function main() {
 
     denemDeviationAvgMaxEl = document.querySelector("#denemDeviationAvgMax");
     param = denemNode.parameters.get("ampDeviationAvgMax");
-    denemDeviationAvgMaxEl.value = param.value.toString();
+    denemDeviationAvgMaxEl.value = param.value.toFixed(2);
 
     denemAvgMinEl = document.querySelector("#denemAvgMin");
     param = denemNode.parameters.get("ampAvgMin");
     denemAvgMinEl.value = param.value.toString();
+
+    //denemDwellThresholdEl = document.querySelector("#dwellThreshold");
+    //param = denemNode.parameters.get("dwellThreshold");
+    //denemDwellThresholdEl.value = param.value.toString();
 
     displayFreqMaxEl.value = Math.round(audioCtx.sampleRate / 2).toString();
 
@@ -502,7 +507,7 @@ function main() {
     });
 
     const numRe = /^[+-]{0,1}\d+([.]\d+){0,1}$/; // Match integer or basic floating point.
-    const posNumRe = /^[1-9][0-9]*([.]\d+){0,1}$/; // Match positive integer or basic floating point.
+    const posNumRe = /^[0-9][0-9]*([.]\d+){0,1}$/; // Match positive integer or basic floating point.
     const posIntRe = /^[1-9][0-9]*$/; // Match positive integer.
     minDbEl.addEventListener('change', function(e) {
         const val = minDbEl.value;
@@ -533,36 +538,43 @@ function main() {
     denemWindowEl.addEventListener('change', function(e) {
         const valStr = e.target.value;
         const val = Number(valStr);
-        if (posIntRe.test(val) && (val >= nemMinWindowSize)) {
-            denemWindowSize = val;
-            const param = denemNode.parameters.get("windowSize");
-            param.value = denemWindowSize;
+        const param = denemNode.parameters.get("windowSize");
+        if (posIntRe.test(valStr) && (val >= nemMinWindowSize)) {
+            param.value = Number(e.target.value);
         } else {
-            e.target.value = denemWindowSize.toString(); // Reset to last known good value.
+            e.target.value = param.value.toString(); // Reset to last known good value.
         }
     });
     denemDeviationAvgMaxEl.addEventListener('change', function(e) {
         const valStr = e.target.value;
         const val = Number(valStr);
-        if (posNumRe.test(val)) {
-            denemAmpDeviationAvgMax = val;
-            const param = denemNode.parameters.get("ampDeviationAvgMax");
-            param.value = denemAmpDeviationAvgMax;
+        const param = denemNode.parameters.get("ampDeviationAvgMax");
+        if (posNumRe.test(valStr)) {
+            param.value = Number(e.target.value);
         } else {
-            e.target.value = denemAmpDeviationAvgMax.toString(); // Reset to last known good value.
+            e.target.value = param.value.toFixed(2); // Reset to last known good value.
         }
     });
     denemAvgMinEl.addEventListener('change', function(e) {
         const valStr = e.target.value;
         const val = Number(valStr);
-        if (numRe.test(val) && (val >= minDb) && (val <= maxDb)) {
-            denemAmpAvgMin = val;
-            const param = denemNode.parameters.get("ampAvgMin");
-            param.value = denemAmpAvgMin;
+        const param = denemNode.parameters.get("ampAvgMin");
+        if (numRe.test(valStr) && (val >= minDb) && (val <= maxDb)) {
+            param.value = Number(e.target.value);
         } else {
-            e.target.value = denemAmpAvgMin.toString(); // Reset to last known good value.
+            e.target.value = param.value.toString(); // Reset to last known good value.
         }
     });
+    //denemDwellThresholdEl.addEventListener('change', function(e) {
+    //    const valStr = e.target.value;
+    //    const val = Number(valStr);
+    //    const param = denemNode.parameters.get("dwellThreshold");
+    //    if (posNumRe.test(valStr) && (val <= 1)) {
+    //        param.value = Number(e.target.value);
+    //    } else {
+    //        e.target.value = param.value.toString(); // Reset to last known good value.
+    //    }
+    //});
 
     denemNode.port.onmessage = (e) => {
         //console.log("msg", e.data.spectrum);
