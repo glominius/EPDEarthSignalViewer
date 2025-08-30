@@ -559,7 +559,7 @@ function main() {
         const valStr = e.target.value;
         const val = Number(valStr);
         const param = denemNode.parameters.get("ampAvgMin");
-        if (numRe.test(valStr) && (val >= minDb) && (val <= maxDb)) {
+        if (numRe.test(valStr) && (val >= minDb)) {
             param.value = Number(e.target.value);
         } else {
             e.target.value = param.value.toString(); // Reset to last known good value.
