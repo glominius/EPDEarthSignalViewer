@@ -141,15 +141,6 @@ class DenemProcessor extends AudioWorkletProcessor {
                 }
             }
 
-if (false)
-for (let bin=1; bin < 69; bin++) {
-    this.fftOut[bin*2] = 0;
-    this.fftOut[bin*2+1] = 0;
-    this.fftOut[(this.sampleSize - bin)*2] = 0;
-    this.fftOut[(this.sampleSize - bin)*2 + 1] = 0;
-    this.fftAmpDb[bin] = 0;
-}
-
             this.fftAmpDb[0] = -100; // Zero DC component.
             this.port.postMessage(this.portObj);
 
