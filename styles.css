@@ -64,6 +64,40 @@ button:active {
     width: 100%;
 }
 
+.tooltip {
+    position: relative;
+    display: inline-block;
+}
+
+.tooltip .tooltiptext {
+    visibility: hidden;
+    width: 180px;
+    background-color: #555;
+    color: #fff;
+    border-radius: 6px;
+    padding: 5px;
+    position: absolute;
+    z-index: 1;
+    bottom: 125%;
+    left: 50%;
+    transform: translate(-50%, 150%);
+    opacity: 0;
+    transition: opacity 0.3s;
+}
+
+.tooltip:hover {
+    background-color: grey;
+}
+
+.tooltip:hover input {
+    color: #f00;
+}
+
+.tooltip:hover .tooltiptext {
+    visibility: visible;
+    opacity: 1;
+}
+
 :root {
   --uiBg: #808080;
   --controlsBg: #707070;

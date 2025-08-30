@@ -82,12 +82,23 @@
                 &nbsp;cursor
                 <input type="text" value="" id="cursorInfo" readonly size="8" />
 
-                &nbsp;Denem: window
-                <input type="text" value="" id="denemWindow" size="8" />
-                &nbsp;deviation
-                <input type="text" value="" id="denemDeviationAvgMax" size="8" /> dB
-                &nbsp;min
-                <input type="text" value="" id="denemAvgMin" size="8" /> dB
+                <div class="tooltip">
+				    &nbsp;Denem: window
+                    <input type="text" value="" id="denemWindow" size="8" />
+					<span class="tooltiptext">#FFT samples in sliding window</span>
+                </div>
+
+                <div class="tooltip">
+                    &nbsp;deviation
+                    <input type="text" value="" id="denemDeviationAvgMax" size="8" /> dB
+					<span class="tooltiptext">Trigger only if average amplitude deviation in sliding window is &lt;= X</span>
+                </div>
+
+                <div class="tooltip">
+                    &nbsp;min
+                    <input type="text" value="" id="denemAvgMin" size="8" /> dB
+					<span class="tooltiptext">Trigger only if average amplitude minimum in sliding window is &gt;= X</span>
+                </div>
             </div>
         </div>
 
