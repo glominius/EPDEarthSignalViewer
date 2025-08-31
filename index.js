@@ -73,10 +73,8 @@ function spectrumMouseMove(x, y) {
     const x0 = yAxisX + yAxisDataMargin; // Minimum X for a frequency bar.
     if (x >= x0) {
         const bin = Math.trunc((x - x0) / (barWidth+barSpacing));
-        const bins = frequencyBinCount;
         const maxFreq = audioCtx.sampleRate / 2;
-        const binBandwidth = maxFreq / bins;
-        const freq = bin * binBandwidth;
+        const freq = (bin / (frequencyBinCount-1)) * maxFreq;
         if (freq <= maxFreq)
             cursorInfoEl.value = Math.round(freq).toString() + "Hz";
         else
@@ -117,8 +115,6 @@ if (false && analyserNode.frequencyBinCount != frequencyBinCount) {
     if (updateAxes)
         createSpectrumAxes();
 
-    //analyserNode.getFloatFrequencyData(sampleArray);
-    //analyserNode.getFloatTimeDomainData(sampleArray);
     const canvasWidth = canvasSpectrumEl.width;
     const canvasHeight = canvasSpectrumEl.height;
     const canvasWaterfallWidth = canvasWaterfallEl.width;
@@ -220,7 +216,6 @@ function constructAudioPipeline() {
     }
 
     splitterNode = audioCtx.createChannelSplitter(1);
-    createSpectrumAxes();
 
     audioSourceNode.connect(splitterNode);
     splitterNode.connect(denemNode);
@@ -287,7 +282,7 @@ function createSpectrumAxes() {
 
     // X axis ticks / labels.
     const bins = frequencyBinCount;
-    const binBandwidth = (audioCtx.sampleRate / 2) / bins;
+    const maxFreq = audioCtx.sampleRate / 2;
     //const displayBandwidth = displayFreqMax - displayFreqMin;
 
     const tickEveryNBins = 25;
@@ -298,7 +293,7 @@ function createSpectrumAxes() {
     for (let bin=0; bin<bins; bin+=tickEveryNBins) {
         const x = yAxisX + yAxisDataMargin + bin*(barWidth+1);
         const yCanvas = canvasSpectrumEl.height - xAxisY;
-        const freq = bin * binBandwidth;
+        const freq = (bin / (frequencyBinCount-1)) * maxFreq;
         canvasSpectrumCtx.beginPath();
         canvasSpectrumCtx.moveTo(x, yCanvas);
         canvasSpectrumCtx.lineTo(x, yCanvas + tickLength);
@@ -357,8 +352,8 @@ function main() {
     canvasSpectrumCtx = canvasSpectrumEl.getContext("2d");
     canvasWaterfallEl = document.querySelector("#waterfall");
     canvasWaterfallCtx = canvasWaterfallEl.getContext("2d");
-    canvasSpectrumEl.width = window.innerWidth
-    canvasWaterfallEl.width = window.innerWidth
+    //canvasSpectrumEl.width = window.innerWidth
+    //canvasWaterfallEl.width = window.innerWidth
 
     const bodyEl = document.querySelector("body");
     uiBg = window.getComputedStyle(bodyEl).getPropertyValue('--uiBg');
@@ -398,6 +393,7 @@ function main() {
 
     smoothingSelectEl = document.querySelector("#smoothingSelect");
     fftBinsSelectEl = document.querySelector("#fftBinsSelect");
+    frequencyBinCount = parseInt(fftBinsSelectEl.value); // Start with default value.
     minDbEl = document.querySelector("#minDb");
     maxDbEl = document.querySelector("#maxDb");
     minDbEl.value = minDb.toString();
@@ -422,6 +418,8 @@ function main() {
     //denemDwellThresholdEl.value = param.value.toString();
 
     displayFreqMaxEl.value = Math.round(audioCtx.sampleRate / 2).toString();
+
+    createSpectrumAxes();
 
     sourceSelectEl.addEventListener('change', function (e) {
         const val = e.target.value;
@@ -501,7 +499,6 @@ function main() {
     //        analyserNode.smoothingTimeConstant = Number(smoothingSelectEl.value);
     //});
 
-    frequencyBinCount = parseInt(fftBinsSelectEl.value); // Start with default value.
     fftBinsSelectEl.addEventListener('change', function(e) {
         frequencyBinCount = parseInt(fftBinsSelectEl.value);
     });
