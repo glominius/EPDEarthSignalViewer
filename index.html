@@ -15,19 +15,22 @@
         <!-- Controls area -->
         <div id="controls">
             <!-- Source row -->
-            <div style="display:block; width:100%">
+            <div id="controlsSource">
                 <!-- feed select area -->
-                <div style="float:left">
+                <div>
                     &nbsp;
-                    <select id="sourceSelect">
-                        <option value="stream">audio stream</option>
-                        <option value="local">local file</option>
-                    </select>
+                    <div class="tooltip">
+                        <select id="sourceSelect">
+                            <option value="stream">audio stream</option>
+                            <option value="local">local file</option>
+                        </select>
+                        <span class="tooltiptext">Select web audio stream or local file.</span>
+                    </div>
 
                     <!-- stream info (when selected) -->
                     <div id="feedStream" style="display:inline-block">
                         &nbsp;url
-                        <input type="url" id="streamURL" value="" size="50" />
+                        <input type="url" id="streamURL" value="" size="45" />
                     </div>
 
                     <!-- local file info (when selected) -->
@@ -37,72 +40,116 @@
                 </div>
 
                 <!-- play controls -->
-                <div style="float:left">
+                <div>
                     &nbsp;
                     <button class="mediaButton" type="button" id="playButton">&#x23F5;</button>
                     <button class="mediaButton" type="button" id="pauseButton" disabled>&#x23F8;</button>
                     <button class="mediaButton" type="button" id="stopButton" disabled>&#x23F9;</button>
+                    &nbsp;
                 </div>
             </div>
 
             <!-- Parameters row -->
-            <div style="float:left; display:block; width:100%">
-                &nbsp;display
-                <input type="text" id="displayFreqMin" value="" size="5" /> Hz to
-                <input type="text" id="displayFreqMax" value="" size="5" /> Hz
+            <div id="controlsParams">
+                <div>
+                    <div class="tooltip">
+                        &nbsp;[DISPLAY]
+                        <span class="tooltiptext">Display options.</span>
+                    </div>
 
-                &nbsp;FFT cross-sample smoothing
-                <select id="smoothingSelect" disabled>
-                    <option value="0.0">0.0 (none)</option>
-                    <option value="0.1">0.1</option>
-                    <option value="0.2">0.2</option>
-                    <option value="0.3">0.3</option>
-                    <option value="0.4">0.4</option>
-                    <option value="0.5">0.5</option>
-                    <option value="0.6">0.6</option>
-                    <option value="0.7">0.7</option>
-                    <option value="0.8">0.8</option>
-                    <option value="0.9">0.9</option>
-                    <option value="0.99">0.99 (lots)</option>
-                </select>
-                &nbsp;FFT bins
-                <select id="fftBinsSelect" disabled>
-                    <option value="16">16</option>
-                    <option value="32">32</option>
-                    <option value="64">64</option>
-                    <option value="128">128</option>
-                    <option value="256">256</option>
-                    <option value="512">512</option>
-                    <option selected value="1024">1024</option>
-                </select>
-                &nbsp;min
-                <input type="text" id="minDb" value="" size=5 title="100 <= min < max" disabled /> dB
-                &nbsp;max
-                <input type="text" id="maxDb" value="" size=5 title="min < max <= -10" disabled /> dB
-                &nbsp;cursor
-                <input type="text" value="" id="cursorInfo" readonly size="8" />
+                    <div class="tooltip">
+                        <input type="text" id="displayFreqMin" value="" size="5" disabled />
+                        <span class="tooltiptext">Minimum frequency to display. [option disabled for now]</span>
+                    </div>
+                    ..
+                    <div class="tooltip">
+                        <input type="text" id="displayFreqMax" value="" size="5" disabled />
+                        <span class="tooltiptext">Maximum frequency to display. [option disabled for now]</span>
+                    </div>
+                    Hz
+                    <div class="divider"></div>
 
-                <div class="tooltip">
-				    &nbsp;Denem: window
-                    <input type="text" value="" id="denemWindow" size="8" />
-					<span class="tooltiptext">#FFT samples in sliding window</span>
+                    <div class="tooltip">
+                        <input type="text" id="minDb" value="" size=5 title="100 <= min < max" disabled />
+                        <span class="tooltiptext">Minimum dB to display. Also used for color gradient. [option disabled for now]</span>
+                    </div>
+                    ..
+                    <div class="tooltip">
+                        <input type="text" id="maxDb" value="" size=5 title="min < max <= -10" disabled /> dB
+                        <span class="tooltiptext">Maximum dB to display. Also used for color gradient. [option disabled for now]</span>
+                    </div>
+                </div>
+
+                <div>
+                    <div class="tooltip">
+                        &nbsp;[FFT]
+                        <span class="tooltiptext">Fast Fourier Transform options.</span>
+                    </div>
+                    <div class="tooltip">
+                        smoothing
+                        <select id="smoothingSelect" disabled>
+                            <option value="0.0">0.0 (none)</option>
+                            <option value="0.1">0.1</option>
+                            <option value="0.2">0.2</option>
+                            <option value="0.3">0.3</option>
+                            <option value="0.4">0.4</option>
+                            <option value="0.5">0.5</option>
+                            <option value="0.6">0.6</option>
+                            <option value="0.7">0.7</option>
+                            <option value="0.8">0.8</option>
+                            <option value="0.9">0.9</option>
+                            <option value="0.99">0.99 (lots)</option>
+                        </select>
+                        <span class="tooltiptext">FFT cross-sample smoothing. [option disabled for now]</span>
+                    </div>
+
+                    <div class="tooltip">
+                        &nbsp;bins
+                        <select id="fftBinsSelect" disabled>
+                            <option value="16">16</option>
+                            <option value="32">32</option>
+                            <option value="64">64</option>
+                            <option value="128">128</option>
+                            <option value="256">256</option>
+                            <option value="512">512</option>
+                            <option selected value="1024">1024</option>
+                        </select>
+                        <span class="tooltiptext">Number of FFT bins. [option disabled for now]</span>
+                    </div>
                 </div>
 
                 <div class="tooltip">
-                    &nbsp;deviation
-                    <input type="text" value="" id="denemDeviationAvgMax" size="8" /> dB
-					<span class="tooltiptext">Trigger only if average amplitude deviation in sliding window is &lt;= X</span>
+                    &nbsp;cursor
+                    <input type="text" value="" id="cursorInfo" readonly size="8" />
+                    <span class="tooltiptext">Moving cursor in spectrum window shows frequency band.</span>
                 </div>
 
-                <div class="tooltip">
-                    &nbsp;min
-                    <input type="text" value="" id="denemAvgMin" size="8" /> dB
-					<span class="tooltiptext">Trigger only if average amplitude minimum in sliding window is &gt;= X.  Set to high value (e.g. 0) to disable.</span>
+                <div>
+                    <div class="tooltip">
+                        &nbsp;[DENEM]
+                        <span class="tooltiptext">"De-nem" filter options.  This is a frequency domain, cross-sample sliding window filter.</span>
+                    </div>
+                    <div class="tooltip">
+                        &nbsp;window
+                        <input type="text" value="" id="denemWindow" size="8" />
+                        <span class="tooltiptext">#FFT samples in sliding window.</span>
+                    </div>
+
+                    <div class="tooltip">
+                        &nbsp;deviation
+                        <input type="text" value="" id="denemDeviationAvgMax" size="8" /> dB
+                        <span class="tooltiptext">Trigger only if average amplitude deviation in sliding window is &lt;= X.</span>
+                    </div>
+
+                    <div class="tooltip">
+                        &nbsp;min
+                        <input type="text" value="" id="denemAvgMin" size="8" /> dB
+                        <span class="tooltiptext">Trigger only if average amplitude minimum in sliding window is &gt;= X.  Set to high value (e.g. 0) to disable.</span>
+                    </div>
                 </div>
             </div>
         </div>
 
-        <br />
         <canvas id="spectrum" height="512"></canvas>
         <canvas id="waterfall" height="512"></canvas>
 
