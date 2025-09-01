@@ -60,7 +60,7 @@ const MaxFFTBins = 1024;
 let minDbEl;
 let maxDbEl;
 let minDb = -100;
-let maxDb = -30;
+let maxDb = -20;
 const MIN_DB = -100;
 const MAX_DB = -10;
 let cursorInfoEl;

@@ -3,7 +3,7 @@ import { FFT } from "./fft_js/fft.js";
 const DefaultBinCount = 1024;
 const DefaultWindowSize = 25;
 const DefaultAmpDeviationAvgMax = 4.8;
-const DefaultAmpAvgMin = -72;
+const DefaultAmpAvgMin = -64;
 const DefaultDwellTheshold = 0.4;
 const FilterNone = 0;
 const FilterBandPass = 1;
@@ -125,7 +125,7 @@ class DenemProcessor extends AudioWorkletProcessor {
         this.bufferOff += sampleCount;
 
         // If sample size is fulfilled, run FFT on sample, modify and populate output buffer.
-        const binScalar = (1 / this.fft.size);
+        const binScalar = (1 / this.binCount); // Half of fft.size.
         if (this.bufferOff >= this.sampleSize) {
             this.fft.realTransform(this.fftOut, this.inputBuffer);
             this.fft.completeSpectrum(this.fftOut);
