@@ -3,7 +3,7 @@ html, body {
     width: 100%;
     height: 100%;
     color: #000000;
-    background-color: var(--controlsBg);
+    background-color: var(--bodyBg);
     font-family: Helvetica;
     font-weight: 400;
     font-size: 18px;
@@ -84,7 +84,7 @@ button:active {
     padding: 2px;
     min-height: 32px;
     border: 1px solid black;
-    background-color: pink;
+    background-color: var(--controlsFieldBg);
 }
 
 #controlsParams > div {
@@ -92,7 +92,7 @@ button:active {
     padding: 2px;
     min-height: 32px;
     border: 1px solid black;
-    background-color: pink;
+    background-color: var(--controlsFieldBg);
 }
 
 .tooltip {
@@ -103,7 +103,7 @@ button:active {
 .tooltip .tooltiptext {
     visibility: hidden;
     width: 180px;
-    background-color: #555;
+    background-color: var(--tooltipBg);
     color: #fff;
     border-radius: 6px;
     padding: 5px;
@@ -117,7 +117,7 @@ button:active {
 }
 
 .tooltip:hover {
-    background-color: grey;
+    background-color: var(--tooltipHoverBg);
 }
 
 .tooltip:hover input {
@@ -137,7 +137,9 @@ button:active {
 }
 
 :root {
-  --uiBg: #808080;
-  --controlsBg: #707070;
-  --controlsFieldBg: #808080;
+  --canvasBg: #707070;
+  --bodyBg: #303030;
+  --controlsFieldBg: #a01010;
+  --tooltipBg: #555;
+  --tooltipHoverBg: pink;
 }

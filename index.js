@@ -44,7 +44,7 @@ let displayFreqMin;
 let displayFreqMax;
 let colorMap;
 let colorMapNem;
-let uiBg;
+let canvasBg;
 let fileLocalEl;
 let paused = false;
 let stopped = true;
@@ -133,7 +133,7 @@ if (false && analyserNode.frequencyBinCount != frequencyBinCount) {
 
     // Display graphics when browswer is ready to draw.
     requestAnimationFrame(() => {
-        canvasSpectrumCtx.fillStyle = uiBg;
+        canvasSpectrumCtx.fillStyle = canvasBg;
         canvasSpectrumCtx.fillRect(yAxisX+1, 0, canvasWidth - (yAxisX+1), canvasHeight - (xAxisY + xAxisDataMargin)); // Clear canvas.
 
         const bins = frequencyBinCount;
@@ -240,7 +240,7 @@ function createColorMap() {
 
 function createSpectrumAxes() {
     // Clear canvas (could have been drawn with different params prior).
-    canvasSpectrumCtx.fillStyle = uiBg;
+    canvasSpectrumCtx.fillStyle = canvasBg;
     canvasSpectrumCtx.fillRect(0, 0, canvasSpectrumEl.width, canvasSpectrumEl.height); // Clear canvas.
 
     canvasSpectrumCtx.lineWidth = 1;
@@ -414,12 +414,12 @@ function main() {
     //canvasWaterfallEl.width = window.innerWidth
 
     const bodyEl = document.querySelector("body");
-    uiBg = window.getComputedStyle(bodyEl).getPropertyValue('--uiBg');
+    canvasBg = window.getComputedStyle(bodyEl).getPropertyValue('--canvasBg');
 
-    canvasSpectrumCtx.fillStyle = uiBg;
+    canvasSpectrumCtx.fillStyle = canvasBg;
     canvasSpectrumCtx.fillRect(0, 0, canvasSpectrumEl.width, canvasSpectrumEl.height);
 
-    canvasWaterfallCtx.fillStyle = uiBg;
+    canvasWaterfallCtx.fillStyle = canvasBg;
     canvasWaterfallCtx.fillRect(0, 0, canvasWaterfallEl.width, canvasWaterfallEl.height);
 
     // Create an off-screen buffer canvas for blitting regions to/from on-screen canvas (scrolling).
@@ -427,7 +427,7 @@ function main() {
     bufferCanvasWaterfallEl.width = canvasWaterfallEl.width;
     bufferCanvasWaterfallEl.height = canvasWaterfallEl.height;
     bufferCanvasWaterfallCtx = bufferCanvasWaterfallEl.getContext("2d");
-    bufferCanvasWaterfallCtx.fillStyle = uiBg;
+    bufferCanvasWaterfallCtx.fillStyle = canvasBg;
     bufferCanvasWaterfallCtx.fillRect(0, 0, bufferCanvasWaterfallEl.width, bufferCanvasWaterfallEl.height);
 
     createColorMap();
