@@ -121,7 +121,7 @@ button:active {
 }
 
 .tooltip:hover input {
-    color: #f00;
+    /* color: #f00; */
 }
 
 .tooltip:hover .tooltiptext {

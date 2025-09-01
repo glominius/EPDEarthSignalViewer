@@ -47,10 +47,7 @@
                     <button class="mediaButton" type="button" id="stopButton" disabled>&#x23F9;</button>
                     &nbsp;
                 </div>
-            </div>
 
-            <!-- Parameters row -->
-            <div id="controlsParams">
                 <div>
                     <div class="tooltip">
                         &nbsp;[DISPLAY]
@@ -79,7 +76,10 @@
                         <span class="tooltiptext">Maximum dB to display. Also used for color gradient. [option disabled for now]</span>
                     </div>
                 </div>
+            </div>
 
+            <!-- Parameters row -->
+            <div id="controlsParams">
                 <div>
                     <div class="tooltip">
                         &nbsp;[FFT]
@@ -127,26 +127,62 @@
                 <div>
                     <div class="tooltip">
                         &nbsp;[DENEM]
-                        <span class="tooltiptext">"De-nem" filter options.  This is a frequency domain, cross-sample sliding window filter.</span>
+                        <span class="tooltiptext">"De-nem" filter options.  This is a frequency domain, adaptive, cross-sample sliding window filter.</span>
                     </div>
                     <div class="tooltip">
                         &nbsp;window
-                        <input type="text" value="" id="denemWindow" size="8" />
+                        <input type="text" value="" id="denemWindow" size="5" />
                         <span class="tooltiptext">#FFT samples in sliding window.</span>
                     </div>
 
                     <div class="tooltip">
                         &nbsp;deviation
-                        <input type="text" value="" id="denemDeviationAvgMax" size="8" /> dB
+                        <input type="text" value="" id="denemDeviationAvgMax" size="6" /> dB
                         <span class="tooltiptext">Trigger only if average amplitude deviation in sliding window is &lt;= X.</span>
                     </div>
 
                     <div class="tooltip">
                         &nbsp;min
-                        <input type="text" value="" id="denemAvgMin" size="8" /> dB
+                        <input type="text" value="" id="denemAvgMin" size="6" /> dB
                         <span class="tooltiptext">Trigger only if average amplitude minimum in sliding window is &gt;= X.  Set to high value (e.g. 0) to disable.</span>
                     </div>
+
+                    <div class="tooltip">
+                        &nbsp;dwell
+                        <input type="text" value="" id="dwellThreshold" size="6" />
+                        <span class="tooltiptext">Dwell theshold ratio.  Over a multiple of window sizes, secondary trigger when primary trigger hits &ge; this ratio of time.</span>
+                    </div>
                 </div>
+
+                <div>
+                    <div class="tooltip">
+                        &nbsp;[FILTER]
+                        <span class="tooltiptext">Additional band pass/reject filter performed in frequency domain.</span>
+                    </div>
+
+                    <div class="tooltip">
+                        <select id="filterType">
+                            <option value="none" selected>none</option>
+                            <option value="bandPass">band pass</option>
+                            <option value="bandReject">band reject</option>
+                        </select>
+                        <span class="tooltiptext">Select filter type</span>
+                    </div>
+
+                    <div class="tooltip">
+                        &nbsp;
+                        <input type="text" value="" id="filterLow" size="6" />
+                        <span class="tooltiptext">Low frequency of specified filter.</span>
+                    </div>
+
+                    <div class="tooltip">
+                        &nbsp;..
+                        <input type="text" value="" id="filterHigh" size="6" />
+                        <span class="tooltiptext">High frequency of specified filter.</span>
+                        Hz
+                    </div>
+                </div>
+
             </div>
         </div>
 

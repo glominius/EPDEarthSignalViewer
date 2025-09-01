@@ -1,14 +1,17 @@
 import { FFT } from "./fft_js/fft.js";
 
 const DefaultBinCount = 1024;
-const DefaultWindowSize = 20;
-const DefaultAmpDeviationAvgMax = 4.2;
+const DefaultWindowSize = 25;
+const DefaultAmpDeviationAvgMax = 4.8;
 const DefaultAmpAvgMin = -72;
-const DefaultDwellTheshold = 0.5;
+const DefaultDwellTheshold = 0.4;
+const FilterNone = 0;
+const FilterBandPass = 1;
+const FilterBandReject = 2;
 
 class DenemProcessor extends AudioWorkletProcessor {
-    constructor() {
-        super();
+    constructor(context) {
+        super(context, "denem");
         this.binCount = DefaultBinCount;
         this.sampleSize = this.binCount * 2;
         this.fft = new FFT(this.sampleSize); // Instance.
@@ -40,6 +43,16 @@ class DenemProcessor extends AudioWorkletProcessor {
         this.nemSamples = 0;
     }
 
+    zeroBin(bin) {
+        this.nemTriggered[bin] = 1; // True.
+
+        // Remove this frequency band.
+        this.fftOut[bin*2] = 0;
+        this.fftOut[bin*2+1] = 0;
+        this.fftOut[(this.sampleSize - bin)*2] = 0;
+        this.fftOut[(this.sampleSize - bin)*2 + 1] = 0;
+    }
+
     static get parameterDescriptors() {
         return [
           {
@@ -55,6 +68,20 @@ class DenemProcessor extends AudioWorkletProcessor {
               defaultValue: DefaultAmpAvgMin,
           },
           {
+              name: "filterType",
+              defaultValue: FilterNone,
+              minValue: FilterNone,
+              maxValue: FilterBandReject,
+          },
+          {
+              name: "filterLowBin",
+              defaultValue: 0,
+          },
+          {
+              name: "filterHighBin",
+              defaultValue: 0,
+          },
+          {
               name: "dwellThreshold",
               defaultValue: DefaultDwellTheshold,
           },
@@ -65,6 +92,9 @@ class DenemProcessor extends AudioWorkletProcessor {
         const windowSize         = parameters.windowSize[0];
         const ampDeviationAvgMax = parameters.ampDeviationAvgMax[0];
         const ampAvgMin          = parameters.ampAvgMin[0];
+        const filterType         = parameters.filterType[0];
+        const filterLowBin       = parameters.filterLowBin[0];
+        const filterHighBin      = parameters.filterHighBin[0];
         const dwellThreshold     = parameters.dwellThreshold[0];
         if (windowSize != this.windowSizePrev) {
             this.clearNemHisto();
@@ -73,6 +103,7 @@ class DenemProcessor extends AudioWorkletProcessor {
     
         let channelInputs = inputList[0]; // Float32Array
         let channelOutputs = outputList[0]; // Float32Array
+        const longWindowSize = windowSize * 8;
   
         if (channelInputs.length == 0) { // No data (feed stopped).
             return true; // Ready to process more.
@@ -118,26 +149,26 @@ class DenemProcessor extends AudioWorkletProcessor {
                 if (this.nemSamples >= windowSize) {
                     const ampDeviationAvg = nemBin.ampDeviationSum / windowSize;
                     const windowTrigger = (ampAvg >= ampAvgMin) && (ampDeviationAvg <= ampDeviationAvgMax);
-                    // const longTermTrigger = (nemBin.triggerDwell / (windowSize * 4)) >= dwellThreshold;
-                    const longTermTrigger = false;
+                    const longTermTrigger = (nemBin.triggerDwell / longWindowSize) >= dwellThreshold;
                     if (windowTrigger || longTermTrigger) {
                         // This bin has nem characteristics.
-                        this.nemTriggered[bin] = 1; // True.
-                        // Remove this frequency band.
-                        this.fftOut[bin*2] = 0;
-                        this.fftOut[bin*2+1] = 0;
-                        this.fftOut[(this.sampleSize - bin)*2] = 0;
-                        this.fftOut[(this.sampleSize - bin)*2 + 1] = 0;
+                        this.zeroBin(bin);
                         if (windowTrigger)
-                            nemBin.triggerDwell++; // Credit as a trigger.
+                            nemBin.triggerDwell = Math.min(longWindowSize, nemBin.triggerDwell+1); // Credit as a trigger.
                         else
-                            nemBin.triggerDwell--; // Credit as a non-trigger.
-                    } {
-                        nemBin.triggerDwell--; // Credit as a non-trigger.
+                            nemBin.triggerDwell = Math.max(0, nemBin.triggerDwell-1); // Credit as a non-trigger.
+                    } else {
+                        nemBin.triggerDwell = Math.max(0, nemBin.triggerDwell-1); // Credit as a non-trigger.
                     }
                     // Sliding window: effectively drop leading sample value for next iteration.
                     nemBin.ampSum = ampAvg * (windowSize - 1);
                     nemBin.ampDeviationSum = ampDeviationAvg * (windowSize - 1);
+                }
+                if ((filterType == FilterBandPass) && ((bin < filterLowBin) || (bin > filterHighBin))) {
+                    this.zeroBin(bin);
+                }
+                else if ((filterType == FilterBandReject) && ((bin >= filterLowBin) && (bin <= filterHighBin))) {
+                    this.zeroBin(bin);
                 }
             }
 

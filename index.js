@@ -2,6 +2,13 @@
 
 import { FFT } from "./fft_js/fft.js";
 
+// Copied from denem.js.
+const FilterNone = 0;
+const FilterBandPass = 1;
+const FilterBandReject = 2;
+let filterLowFrequency = 1022; // Hz.
+let filterHighFrequency = 2250; // Hz.
+
 const barWidth = 2;
 const barSpacing = 0;
 const yAxisX = 25;
@@ -61,7 +68,7 @@ let nemSamples;
 let denemWindowEl;
 let denemDeviationAvgMaxEl;
 let denemAvgMinEl;
-//let denemDwellThresholdEl;
+let denemDwellThresholdEl;
 let denemNode;
 
 let fft; // Instance of FFT().
@@ -163,10 +170,11 @@ if (false && analyserNode.frequencyBinCount != frequencyBinCount) {
             // === Watervall view ===
             // Waterfall scroll step 2: update latest row off-screen.
             bufferCanvasWaterfallCtx.fillStyle = fillStyle;
+            const width = (barSpacing > 0) && (barWidth == 1) ? barWidth + 1 : barWidth;
             if (waterfallScrollUp)
-                bufferCanvasWaterfallCtx.fillRect(x, canvasWaterfallHeight-1, barWidth, 1);
+                bufferCanvasWaterfallCtx.fillRect(x, canvasWaterfallHeight-1, width, 1);
             else
-                bufferCanvasWaterfallCtx.fillRect(x, 0, barWidth, 1);
+                bufferCanvasWaterfallCtx.fillRect(x, 0, width, 1);
         }
 
         // Waterfall scroll step 3: blit off-screen to on-screen.
@@ -285,13 +293,15 @@ function createSpectrumAxes() {
     const maxFreq = audioCtx.sampleRate / 2;
     //const displayBandwidth = displayFreqMax - displayFreqMin;
 
-    const tickEveryNBins = 25;
-    const barWidth = 1;
+    const pixelsPerTick = 36; // Label a tick every this many pixels.
+    const pixelsAllTicks = (frequencyBinCount-1) * (barWidth + barSpacing);
+    const pixelsPerBin = pixelsAllTicks / (bins - 1);
+    let tickEveryNBins = Math.ceil(pixelsPerTick / pixelsPerBin);
     canvasSpectrumCtx.font = "12px trebuchet ms";
     canvasSpectrumCtx.textAlign = "center";
     canvasSpectrumCtx.textBaseline = "top";
     for (let bin=0; bin<bins; bin+=tickEveryNBins) {
-        const x = yAxisX + yAxisDataMargin + bin*(barWidth+1);
+        const x = yAxisX + yAxisDataMargin + bin*(barWidth+barSpacing);
         const yCanvas = canvasSpectrumEl.height - xAxisY;
         const freq = (bin / (frequencyBinCount-1)) * maxFreq;
         canvasSpectrumCtx.beginPath();
@@ -343,7 +353,55 @@ function playbackStopped() {
     fileLocalEl.value = ""; // Prevent caching in case it's reloaded.
 }
 
+function frequencyToBin(freq) {
+    const maxFreq = audioCtx.sampleRate / 2;
+    const bin = Math.round((freq / maxFreq) * (frequencyBinCount-1));
+    return(bin);
+}
+
+function setFilter(filterTypeEl, filterLowEl, filterHighEl, posNumRe) {
+    const lowStr = filterLowEl.value;
+    const low = Number(lowStr);
+    const highStr = filterHighEl.value;
+    const high = Number(highStr);
+    const maxFreq = audioCtx.sampleRate / 2;
+
+    const filterTypeParam = denemNode.parameters.get("filterType");
+    const filterLowBinParam = denemNode.parameters.get("filterLowBin");
+    const filterHighBinParam = denemNode.parameters.get("filterHighBin");
+
+    if (!posNumRe.test(lowStr) ||
+            !posNumRe.test(highStr) ||
+            (low > high) ||
+            (high > maxFreq)) {
+        // Bad inputs; reset frequencies to last known good value.
+        filterLowEl.value = filterLowFrequency.toString();
+        filterHighEl.value = filterHighFrequency.toString();
+        return;
+        }
+
+    if (filterTypeEl.value == "none") {
+        filterTypeParam.value = FilterNone;
+    } else if (filterTypeEl.value == "bandPass") {
+        filterTypeParam.value = FilterBandPass;
+    } else if (filterTypeEl.value == "bandReject") {
+        filterTypeParam.value = FilterBandReject;
+    }
+
+    // Remember actual frequency values from HTML.
+    filterLowFrequency = low;
+    filterHighFrequency = high;
+
+    // Set values in denemNode.
+    filterLowBinParam.value = frequencyToBin(low);
+    filterHighBinParam.value = frequencyToBin(high);
+}
+
 function main() {
+    const numRe = /^[+-]{0,1}\d+([.]\d+){0,1}$/; // Match integer or basic floating point.
+    const posNumRe = /^[0-9][0-9]*([.]\d+){0,1}$/; // Match positive integer or basic floating point.
+    const posIntRe = /^[1-9][0-9]*$/; // Match positive integer.
+
     playButton = document.querySelector("#playButton");
     pauseButton = document.querySelector("#pauseButton");
     stopButton = document.querySelector("#stopButton");
@@ -413,9 +471,16 @@ function main() {
     param = denemNode.parameters.get("ampAvgMin");
     denemAvgMinEl.value = param.value.toString();
 
-    //denemDwellThresholdEl = document.querySelector("#dwellThreshold");
-    //param = denemNode.parameters.get("dwellThreshold");
-    //denemDwellThresholdEl.value = param.value.toString();
+    const filterTypeEl = document.querySelector("#filterType");
+    const filterLowEl = document.querySelector("#filterLow");
+    const filterHighEl =  document.querySelector("#filterHigh");
+    filterLowEl.value = filterLowFrequency.toString();
+    filterHighEl.value = filterHighFrequency.toString();
+    setFilter(filterTypeEl, filterLowEl, filterHighEl, posNumRe);
+
+    denemDwellThresholdEl = document.querySelector("#dwellThreshold");
+    param = denemNode.parameters.get("dwellThreshold");
+    denemDwellThresholdEl.value = param.value.toFixed(2);
 
     displayFreqMaxEl.value = Math.round(audioCtx.sampleRate / 2).toString();
 
@@ -503,9 +568,6 @@ function main() {
         frequencyBinCount = parseInt(fftBinsSelectEl.value);
     });
 
-    const numRe = /^[+-]{0,1}\d+([.]\d+){0,1}$/; // Match integer or basic floating point.
-    const posNumRe = /^[0-9][0-9]*([.]\d+){0,1}$/; // Match positive integer or basic floating point.
-    const posIntRe = /^[1-9][0-9]*$/; // Match positive integer.
     minDbEl.addEventListener('change', function(e) {
         const val = minDbEl.value;
         const dB = Number(minDbEl.value);
@@ -562,16 +624,26 @@ function main() {
             e.target.value = param.value.toString(); // Reset to last known good value.
         }
     });
-    //denemDwellThresholdEl.addEventListener('change', function(e) {
-    //    const valStr = e.target.value;
-    //    const val = Number(valStr);
-    //    const param = denemNode.parameters.get("dwellThreshold");
-    //    if (posNumRe.test(valStr) && (val <= 1)) {
-    //        param.value = Number(e.target.value);
-    //    } else {
-    //        e.target.value = param.value.toString(); // Reset to last known good value.
-    //    }
-    //});
+    denemDwellThresholdEl.addEventListener('change', function(e) {
+        const valStr = e.target.value;
+        const val = Number(valStr);
+        const param = denemNode.parameters.get("dwellThreshold");
+        if (posNumRe.test(valStr) && (val >= 0.05) && (val <= 1)) {
+            param.value = Number(e.target.value);
+        } else {
+            e.target.value = param.value.toFixed(2); // Reset to last known good value.
+        }
+    });
+
+    filterTypeEl.addEventListener('change', function(e) {
+        setFilter(filterTypeEl, filterLowEl, filterHighEl, posNumRe);
+    });
+    filterLowEl.addEventListener('change', function(e) {
+        setFilter(filterTypeEl, filterLowEl, filterHighEl, posNumRe);
+    });
+    filterHighEl.addEventListener('change', function(e) {
+        setFilter(filterTypeEl, filterLowEl, filterHighEl, posNumRe);
+    });
 
     denemNode.port.onmessage = (e) => {
         //console.log("msg", e.data.spectrum);
