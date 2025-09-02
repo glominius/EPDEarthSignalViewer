@@ -64,7 +64,7 @@
                         <span class="tooltiptext">Maximum frequency to display. [option disabled for now]</span>
                     </div>
                     Hz
-                    <div class="divider"></div>
+                    <div class="divider">&#9483;</div>
 
                     <div class="tooltip">
                         <input type="text" id="minDb" value="" size=5 title="100 <= min < max" disabled />
@@ -75,6 +75,16 @@
                         <input type="text" id="maxDb" value="" size=5 title="min < max <= -10" disabled /> dB
                         <span class="tooltiptext">Maximum dB to display. Also used for color gradient. [option disabled for now]</span>
                     </div>
+                    <div class="divider">&#9483;</div>
+
+                    <div class="tooltip">
+                        <select id="displayType">
+                            <option value="sample" selected>sample</option>
+                            <option value="average">average</option>
+                        </select>
+                        <span class="tooltiptext">Select amplitude display type: each sample or average in window.</span>
+                    </div>
+
                 </div>
             </div>
 
@@ -147,11 +157,6 @@
                         <span class="tooltiptext">Trigger only if average amplitude minimum in sliding window is &gt;= X.  Set to high value (e.g. 0) to disable.</span>
                     </div>
 
-                    <div class="tooltip">
-                        &nbsp;dwell
-                        <input type="text" value="" id="dwellThreshold" size="6" />
-                        <span class="tooltiptext">Dwell theshold ratio.  Over a multiple of window sizes, secondary trigger when primary trigger hits &ge; this ratio of time.</span>
-                    </div>
                 </div>
 
                 <div>
@@ -162,9 +167,9 @@
 
                     <div class="tooltip">
                         <select id="filterType">
-                            <option value="none" selected>none</option>
+                            <option value="none">none</option>
                             <option value="bandPass">band pass</option>
-                            <option value="bandReject">band reject</option>
+                            <option value="bandReject" selected>band reject</option>
                         </select>
                         <span class="tooltiptext">Select filter type</span>
                     </div>

@@ -87,6 +87,10 @@ button:active {
     background-color: var(--controlsFieldBg);
 }
 
+#controlsSource,#controlsParams * {
+    align-items: center;
+}
+
 #controlsParams > div {
     margin: 1px;
     padding: 2px;
@@ -130,10 +134,8 @@ button:active {
 }
 
 .divider {
-    border: 1px dashed grey;
-    height: 70%;
     display: inline-block;
-    vertical-align: center;
+    color: #999;
 }
 
 :root {

@@ -1,11 +1,7 @@
 'use strict';
 
-import { FFT } from "./fft_js/fft.js";
+import { DenemK } from "./denem_k.js";
 
-// Copied from denem.js.
-const FilterNone = 0;
-const FilterBandPass = 1;
-const FilterBandReject = 2;
 let filterLowFrequency = 1022; // Hz.
 let filterHighFrequency = 2250; // Hz.
 
@@ -68,12 +64,8 @@ let nemSamples;
 let denemWindowEl;
 let denemDeviationAvgMaxEl;
 let denemAvgMinEl;
-let denemDwellThresholdEl;
+//let denemDwellThresholdEl;
 let denemNode;
-
-let fft; // Instance of FFT().
-let fftOut; // FFT complex outputs.
-let fftAmpDb; // FFT outputs processed to only magnitude in dB.
 
 
 function spectrumMouseMove(x, y) {
@@ -188,9 +180,6 @@ function constructAudioPipeline() {
 
 // FIXME: resize following on change of frequencyBinCount
     sampleArray = new Float32Array(frequencyBinCount*2);
-    fft = new FFT(frequencyBinCount*2); // Instance.
-    fftOut = fft.createComplexArray(); // Complex outputs [real, imag, real, imag, ...]
-    fftAmpDb = Array(frequencyBinCount).fill(0); // Output bins processed into dB.
 
     // Disconnect previously created nodes.
     //if (javascriptNode)
@@ -381,11 +370,11 @@ function setFilter(filterTypeEl, filterLowEl, filterHighEl, posNumRe) {
         }
 
     if (filterTypeEl.value == "none") {
-        filterTypeParam.value = FilterNone;
+        filterTypeParam.value = DenemK.FilterNone;
     } else if (filterTypeEl.value == "bandPass") {
-        filterTypeParam.value = FilterBandPass;
+        filterTypeParam.value = DenemK.FilterBandPass;
     } else if (filterTypeEl.value == "bandReject") {
-        filterTypeParam.value = FilterBandReject;
+        filterTypeParam.value = DenemK.FilterBandReject;
     }
 
     // Remember actual frequency values from HTML.
@@ -478,9 +467,11 @@ function main() {
     filterHighEl.value = filterHighFrequency.toString();
     setFilter(filterTypeEl, filterLowEl, filterHighEl, posNumRe);
 
-    denemDwellThresholdEl = document.querySelector("#dwellThreshold");
-    param = denemNode.parameters.get("dwellThreshold");
-    denemDwellThresholdEl.value = param.value.toFixed(2);
+    const displayTypeEl = document.querySelector("#displayType");
+
+    //denemDwellThresholdEl = document.querySelector("#dwellThreshold");
+    //param = denemNode.parameters.get("dwellThreshold");
+    //denemDwellThresholdEl.value = param.value.toFixed(2);
 
     displayFreqMaxEl.value = Math.round(audioCtx.sampleRate / 2).toString();
 
@@ -624,16 +615,16 @@ function main() {
             e.target.value = param.value.toString(); // Reset to last known good value.
         }
     });
-    denemDwellThresholdEl.addEventListener('change', function(e) {
-        const valStr = e.target.value;
-        const val = Number(valStr);
-        const param = denemNode.parameters.get("dwellThreshold");
-        if (posNumRe.test(valStr) && (val >= 0.05) && (val <= 1)) {
-            param.value = Number(e.target.value);
-        } else {
-            e.target.value = param.value.toFixed(2); // Reset to last known good value.
-        }
-    });
+    //denemDwellThresholdEl.addEventListener('change', function(e) {
+    //    const valStr = e.target.value;
+    //    const val = Number(valStr);
+    //    const param = denemNode.parameters.get("dwellThreshold");
+    //    if (posNumRe.test(valStr) && (val >= 0.05) && (val <= 1)) {
+    //        param.value = Number(e.target.value);
+    //    } else {
+    //        e.target.value = param.value.toFixed(2); // Reset to last known good value.
+    //    }
+    //});
 
     filterTypeEl.addEventListener('change', function(e) {
         setFilter(filterTypeEl, filterLowEl, filterHighEl, posNumRe);
@@ -643,6 +634,19 @@ function main() {
     });
     filterHighEl.addEventListener('change', function(e) {
         setFilter(filterTypeEl, filterLowEl, filterHighEl, posNumRe);
+    });
+
+    displayTypeEl.addEventListener('change', function(e) {
+        let val = displayTypeEl.value;
+        let obj;
+        if (val === "sample")
+            obj = { param: "displayType", value: DenemK.DisplayTypeSample };
+        else if (val === "average")
+            obj = { param: "displayType", value: DenemK.DisplayTypeAverage };
+        else {
+            throw new Error(`displayType of ${val}`);
+        }
+        denemNode.port.postMessage(obj);
     });
 
     denemNode.port.onmessage = (e) => {
