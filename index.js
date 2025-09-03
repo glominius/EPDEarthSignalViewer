@@ -210,7 +210,7 @@ if (false && analyserNode.frequencyBinCount != frequencyBinCount) {
             const el = canvasMetricsEl;
             const el2 = bufferCanvasMetricsEl;
             const canvasHeight = el.height;
-            function toCanvasY(y) { return((el.height-1) - y); }
+            function canvasY(y) { return((el.height-1) - y); }
 
             const avgDb = sumDb / (frequencyBinCount - 1); // Skip DC bin.
             const ratio = (avgDb - minDecibels) / rangeDecibels;
@@ -228,8 +228,8 @@ if (false && analyserNode.frequencyBinCount != frequencyBinCount) {
                 ctx.strokeStyle = colorMap[intensity];
                 ctx.beginPath();
                 // 0.5 added because otherwise canvas drawing creates wider & grayer lines.
-                ctx.moveTo(0.5 + nonDataWidth + metricsSamples, toCanvasY(xAxisY + xAxisDataMargin));
-                ctx.lineTo(0.5 + nonDataWidth + metricsSamples, toCanvasY(y));
+                ctx.moveTo(0.5 + nonDataWidth + metricsSamples, canvasY(xAxisY + xAxisDataMargin));
+                ctx.lineTo(0.5 + nonDataWidth + metricsSamples, canvasY(y));
                 ctx.stroke();
             } else {
                 // Scroll step1: blit on-screen minus oldest column to off-screen.
@@ -243,13 +243,13 @@ if (false && analyserNode.frequencyBinCount != frequencyBinCount) {
                 // Scroll step2: update latest column off-screen.
                 ctx2.strokeStyle = colorMap[intensity];
                 ctx2.beginPath();
-                ctx2.moveTo(el.width-1, toCanvasY(xAxisY + xAxisDataMargin));
-                ctx2.lineTo(el.width-1, toCanvasY(y));
+                ctx2.moveTo(el.width-1, canvasY(xAxisY + xAxisDataMargin));
+                ctx2.lineTo(el.width-1, canvasY(y));
                 ctx2.stroke();
 
                 ctx2.strokeStyle = canvasBg; // Clear pixels above line.
                 ctx2.beginPath();
-                ctx2.moveTo(el.width-1, toCanvasY(y+1));
+                ctx2.moveTo(el.width-1, canvasY(y+1));
                 ctx2.lineTo(el.width-1, 0);
                 ctx2.stroke();
 
@@ -316,20 +316,23 @@ function createColorMap() {
 
 function initUpperPanel() {
     // Clear canvas (could have been drawn with different params prior).
-    canvasSpectrumCtx.fillStyle = canvasBg;
-    canvasSpectrumCtx.fillRect(0, 0, canvasSpectrumEl.width, canvasSpectrumEl.height); // Clear canvas.
+    const ctx = canvasSpectrumCtx;
+    ctx.fillStyle = canvasBg;
+    ctx.fillRect(0, 0, canvasSpectrumEl.width, canvasSpectrumEl.height); // Clear canvas.
 
-    canvasSpectrumCtx.lineWidth = 1;
-    canvasSpectrumCtx.strokeStyle = "black";
-    canvasSpectrumCtx.fillStyle = "black";
+    ctx.lineWidth = 1;
+    ctx.strokeStyle = "black";
+    ctx.fillStyle = "black";
     const yAxisHeight = canvasSpectrumEl.height - xAxisY;
     const xAxisYCanvas = canvasSpectrumEl.height - xAxisY;
 
-    // Y axis.
-    canvasSpectrumCtx.beginPath();
-    canvasSpectrumCtx.moveTo(yAxisX, 0);
-    canvasSpectrumCtx.lineTo(yAxisX, xAxisYCanvas);
-    canvasSpectrumCtx.stroke();
+    // === Y axis ===
+    ctx.beginPath();
+    ctx.moveTo(yAxisX, 0);
+    ctx.lineTo(yAxisX, xAxisYCanvas);
+    ctx.stroke();
+    const canvasHeight = canvasSpectrumEl.height;
+    function canvasY(y) { return((canvasHeight-1) - y); }
 
     // Y axis ticks / labels.
     const decibelRange = maxDb - minDb;
@@ -345,24 +348,33 @@ function initUpperPanel() {
     else
         yAxisInterval = 10;
     const interval0 = Math.ceil(minDb / yAxisInterval) * yAxisInterval;
-    canvasSpectrumCtx.font = "12px trebuchet ms";
-    canvasSpectrumCtx.textAlign = "right";
-    canvasSpectrumCtx.textBaseline = "middle";
+    ctx.font = "12px trebuchet ms";
+    ctx.textAlign = "right";
+    ctx.textBaseline = "middle";
     for (let interval = interval0; interval <= maxDb; interval += yAxisInterval) {
         const y = ((interval - minDb) / decibelRange) * yAxisHeight;
-        const yCanvas = canvasSpectrumEl.height - (xAxisY + y);
-        canvasSpectrumCtx.beginPath();
-        canvasSpectrumCtx.moveTo(yAxisX, yCanvas);
-        canvasSpectrumCtx.lineTo(yAxisX - tickLength, yCanvas);
-        canvasSpectrumCtx.stroke();
-        canvasSpectrumCtx.fillText(`${interval}`, yAxisX - (tickLength + labelMargin), yCanvas);
+        const yCanvas = canvasY(xAxisY + y);
+        ctx.beginPath();
+        ctx.moveTo(yAxisX, yCanvas);
+        ctx.lineTo(yAxisX - tickLength, yCanvas);
+        ctx.stroke();
+        ctx.fillText(`${interval}`, yAxisX - (tickLength + labelMargin), yCanvas);
     }
 
-    // X axis.
-    canvasSpectrumCtx.beginPath();
-    canvasSpectrumCtx.moveTo(yAxisX, xAxisYCanvas);
-    canvasSpectrumCtx.lineTo(canvasSpectrumEl.width-1, xAxisYCanvas);
-    canvasSpectrumCtx.stroke();
+    // Units label.
+    ctx.save();
+    ctx.translate(yAxisX - (tickLength + labelMargin), canvasY(xAxisY + 4));
+    ctx.rotate(-Math.PI / 2);
+    ctx.textAlign = "left";
+    ctx.textBaseline = "alphabetic";
+    ctx.fillText("dB", 0, 0);
+    ctx.restore(); // Undo translation etc.
+
+    // === X axis ===
+    ctx.beginPath();
+    ctx.moveTo(yAxisX, xAxisYCanvas);
+    ctx.lineTo(canvasSpectrumEl.width-1, xAxisYCanvas);
+    ctx.stroke();
 
     // X axis ticks / labels.
     const bins = frequencyBinCount;
@@ -373,19 +385,24 @@ function initUpperPanel() {
     const pixelsAllTicks = (frequencyBinCount-1) * (barWidth + barSpacing);
     const pixelsPerBin = pixelsAllTicks / (bins - 1);
     let tickEveryNBins = Math.ceil(pixelsPerTick / pixelsPerBin);
-    canvasSpectrumCtx.font = "12px trebuchet ms";
-    canvasSpectrumCtx.textAlign = "center";
-    canvasSpectrumCtx.textBaseline = "top";
+    ctx.font = "12px trebuchet ms";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "top";
     for (let bin=0; bin<bins; bin+=tickEveryNBins) {
         const x = yAxisX + yAxisDataMargin + bin*(barWidth+barSpacing);
         const yCanvas = canvasSpectrumEl.height - xAxisY;
         const freq = (bin / (frequencyBinCount-1)) * maxFreq;
-        canvasSpectrumCtx.beginPath();
-        canvasSpectrumCtx.moveTo(x, yCanvas);
-        canvasSpectrumCtx.lineTo(x, yCanvas + tickLength);
-        canvasSpectrumCtx.stroke();
-        canvasSpectrumCtx.fillText(`${Math.round(freq)}`, x, yCanvas + tickLength + labelMargin);
+        ctx.beginPath();
+        ctx.moveTo(x, yCanvas);
+        ctx.lineTo(x, yCanvas + tickLength);
+        ctx.stroke();
+        ctx.fillText(`${Math.round(freq)}`, x, yCanvas + tickLength + labelMargin);
     }
+
+    // Units label.
+    ctx.textAlign = "right";
+    ctx.textBaseline = "top";
+    ctx.fillText("Hz", yAxisX - tickLength, canvasY(xAxisY - (tickLength + labelMargin)));
 }
 
 function initLowerPanel() {
@@ -408,30 +425,32 @@ function initLowerPanel() {
         canvasWaterfallEl.style.display = "none"; // Invisible.
         const el = canvasMetricsEl;
         const ctx = canvasMetricsCtx = el.getContext("2d");
+        const canvasHeight = el.height;
+        const canvasWidth = el.width;
         el.style.display = "block"; // Enable.
         ctx.fillStyle = canvasBg;
-        ctx.fillRect(0, 0, el.width, el.height);
+        ctx.fillRect(0, 0, canvasWidth, canvasHeight);
         metricsSamples = 0; // Reset.
 
         if (!bufferCanvasMetricsEl) {
             bufferCanvasMetricsEl = document.createElement('canvas');
             bufferCanvasMetricsCtx = bufferCanvasMetricsEl.getContext("2d");
         }
-        bufferCanvasMetricsEl.width = canvasWaterfallEl.width;
-        bufferCanvasMetricsEl.height = canvasWaterfallEl.height;
+        bufferCanvasMetricsEl.width = canvasWidth;
+        bufferCanvasMetricsEl.height = canvasHeight;
         bufferCanvasMetricsCtx.fillStyle = canvasBg;
-        bufferCanvasMetricsCtx.fillRect(0, 0, bufferCanvasMetricsEl.width, bufferCanvasMetricsEl.height);
+        bufferCanvasMetricsCtx.fillRect(0, 0, canvasWidth, canvasHeight);
 
         ctx.strokeStyle = "black";
-        function toCanvasY(y) { return((el.height-1) - y); }
+        function canvasY(y) { return((canvasHeight-1) - y); }
 
-        // Y axis.
+        // === Y axis ===
         ctx.lineWidth = 2;
         ctx.fillStyle = "black";
         ctx.font = "12px trebuchet ms";
         ctx.textAlign = "right";
         ctx.textBaseline = "middle";
-        const yAxisHeight = el.height - xAxisY;
+        const yAxisHeight = canvasHeight - xAxisY;
         ctx.beginPath();
         ctx.moveTo(yAxisX, 0);
         ctx.lineTo(yAxisX, yAxisHeight);
@@ -441,7 +460,7 @@ function initLowerPanel() {
         const decibelRange = maxDb - minDb;
         for (let tickDb=minDb + yInterval/2; tickDb <= maxDb; tickDb += yInterval) {
             const y = ((tickDb - minDb) / decibelRange) * yAxisHeight;
-            const yCanvas = el.height - (xAxisY + y);
+            const yCanvas = canvasHeight - (xAxisY + y);
             ctx.beginPath();
             ctx.moveTo(yAxisX, yCanvas);
             ctx.lineTo(yAxisX - tickLength, yCanvas);
@@ -449,16 +468,30 @@ function initLowerPanel() {
             ctx.fillText(`${tickDb}`, yAxisX - (tickLength + labelMargin), yCanvas);
         }
 
-        // X axis.
+        // Units label.
+        ctx.save();
+        ctx.translate(yAxisX - (tickLength + labelMargin), canvasY(xAxisY + 4));
+        ctx.rotate(-Math.PI / 2);
+        ctx.textAlign = "left";
+        ctx.textBaseline = "alphabetic";
+        ctx.fillText("dB", 0, 0);
+        ctx.restore(); // Undo translation etc.
+
+        // === X axis ===
         ctx.beginPath();
         ctx.moveTo(yAxisX, yAxisHeight);
-        ctx.lineTo(el.width-1, yAxisHeight);
+        ctx.lineTo(canvasWidth-1, yAxisHeight);
         ctx.stroke();
 
         ctx.textAlign = "center";
         ctx.textBaseline = "top";
-        ctx.fillText("time", el.width/2, toCanvasY(xAxisY - labelMargin*2));
+        ctx.fillText("time", canvasWidth/2, canvasY(xAxisY - labelMargin*2));
         ctx.lineWidth = 1;
+
+        // Units label.
+        ctx.textAlign = "right";
+        ctx.textBaseline = "top";
+        ctx.fillText("Hz", yAxisX - tickLength, canvasY(xAxisY - (tickLength + labelMargin)));
     }
 }
 
