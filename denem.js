@@ -10,28 +10,29 @@ class DenemProcessor extends AudioWorkletProcessor {
         this.fftOut = this.fft.createComplexArray(); // Complex outputs [real, imag, real, imag, ...]
         this.fftInverse = this.fft.createComplexArray(); // Complex outputs [real, imag, real, imag, ...]
         this.fftAmpDb = new Float32Array(this.binCount); // Output bins processed into dB.
+        this.fftAmpAvgDb = new Float32Array(this.binCount); // Like above but for average within window.
         this.inputBuffer = new Float32Array(this.sampleSize); // For accumulating 256-byte chunks.
         this.outputBuffer = new Float32Array(this.sampleSize); // FFT output
         this.bufferOff = 0;
         this.nemTriggered = new Uint8Array(this.binCount);
         this.nemSamples = 0;
         this.windowSizePrev = DenemK.DefaultWindowSize;
-        this.displayType = DenemK.DisplayTypeSample;
         this.nemHisto = Array.from({ length: this.binCount }, (_, i) => ({
             ampSum: 0,
             ampDeviationSum: 0,
             }));
         this.portObj = {
             fftAmpDb: this.fftAmpDb,
+            fftAmpAvgDb: this.fftAmpAvgDb,
             nemTriggered: this.nemTriggered,
         };
         this.port.onmessage = (e) => {
             const obj = e.data;
-            if (obj.param === "displayType") {
-                this.displayType = obj.value;
-            } else {
-                console.log("message unrecognized", obj);
-            }
+            //if (obj.param === "displayType") {
+            //    this.displayType = obj.value;
+            //} else {
+            //    console.log("message unrecognized", obj);
+            //}
         };
     }
 
@@ -161,11 +162,9 @@ class DenemProcessor extends AudioWorkletProcessor {
             nemBin.ampDeviationSum += ampDeviation;
             this.nemTriggered[bin] = 0; // False.
 
-            // Value passed back to spectrum analyzer panel.
-            if (this.displayType == DenemK.DisplayTypeSample)
-                this.fftAmpDb[bin] = sampleDb;
-            else
-                this.fftAmpDb[bin] = ampAvg;
+            // Values passed back to main UI.
+            this.fftAmpDb[bin] = sampleDb;
+            this.fftAmpAvgDb[bin] = ampAvg;
 
             if (this.nemSamples >= windowSize) {
                 const ampDeviationAvg = nemBin.ampDeviationSum / windowSize;

@@ -18,7 +18,7 @@
             <div id="controlsSource">
                 <!-- feed select area -->
                 <div>
-                    &nbsp;
+                    &nbsp;[SOURCE]
                     <div class="tooltip">
                         <select id="sourceSelect">
                             <option value="stream">audio stream</option>
@@ -77,12 +77,22 @@
                     </div>
                     <div class="divider">&#9483;</div>
 
+                    spectrum Y
                     <div class="tooltip">
                         <select id="displayType">
                             <option value="sample" selected>sample</option>
                             <option value="average">average</option>
                         </select>
                         <span class="tooltiptext">Select amplitude display type: each sample or average in window.</span>
+                    </div>
+
+                    &nbsp;lower panel
+                    <div class="tooltip">
+                        <select id="lowerPanel">
+                            <option value="waterfall" selected>waterfall</option>
+                            <option value="metrics">average</option>
+                        </select>
+                        <span class="tooltiptext">Select what's displayed in lower panel: waterfall or spectrum amplitude average.</span>
                     </div>
 
                 </div>
@@ -191,8 +201,9 @@
             </div>
         </div>
 
-        <canvas id="spectrum" height="512" width="2076"></canvas>
+        <canvas id="spectrum"  height="512" width="2076"></canvas>
         <canvas id="waterfall" height="512" width="2076"></canvas>
+        <canvas id="metrics"   height="512" width="2076" style="display:none"></canvas>
 
         <script type="module" src="./fft_js/fft.js"></script>
         <script type="module" src="index.js"></script>

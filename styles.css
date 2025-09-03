@@ -114,7 +114,7 @@ button:active {
     position: absolute;
     z-index: 1;
     left: 0%;
-    transform: translateY(40px);
+    transform: translateY(75px);
     opacity: 0;
     transition: opacity 0.3s;
     vertical-align: top;

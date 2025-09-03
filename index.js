@@ -13,8 +13,13 @@ const yAxisDataMargin = 5;
 const xAxisDataMargin = 2;
 const tickLength = 4;
 const labelMargin = 2;
+const DisplayWaterfall = 0;
 
 const nemMinWindowSize = 10; // Arbitrary.
+const DisplayLower = Object.freeze({
+    waterfall: 1,
+    metrics: 2,
+});
 
 let audioCtx;
 let splitterNode;
@@ -27,8 +32,12 @@ let canvasSpectrumEl;
 let canvasSpectrumCtx;
 let canvasWaterfallEl;
 let canvasWaterfallCtx;
+let canvasMetricsEl;
+let canvasMetricsCtx;
 let bufferCanvasWaterfallEl;
 let bufferCanvasWaterfallCtx;
+let bufferCanvasMetricsEl;
+let bufferCanvasMetricsCtx;
 let waterfallScrollUp = false;
 let audioStreamEl;
 //let javascriptNode;
@@ -66,7 +75,21 @@ let denemDeviationAvgMaxEl;
 let denemAvgMinEl;
 //let denemDwellThresholdEl;
 let denemNode;
+let displayLowerPanel = DisplayLower.waterfall;
+let spectrumY = DenemK.DisplayTypeSample;
+let metricsSamples = 0;
 
+
+function getLowerPanelType(str) {
+    if (str === "waterfall") {
+        return(DisplayLower.waterfall);
+    } else if (str === "metrics") {
+        return(DisplayLower.metrics);
+    } else {
+        throw new Error(`panel type: ${str}`);
+        return(DisplayLower.waterfall);
+    }
+}
 
 function spectrumMouseMove(x, y) {
     const x0 = yAxisX + yAxisDataMargin; // Minimum X for a frequency bar.
@@ -84,7 +107,15 @@ function spectrumMouseMove(x, y) {
 }
 
 // Graphics update routine called frequently.
-function processAudio(fftAmpDb, nemTriggered) {
+function processAudio(data) {
+    let spectrumAmpDb;
+    if (spectrumY === DenemK.DisplayTypeSample)
+        spectrumAmpDb = data.fftAmpDb;
+    else
+        spectrumAmpDb = data.fftAmpAvgDb;
+    const metricsAmpDb = data.fftAmpDb;
+    const nemTriggered = data.nemTriggered;
+
     if (paused || stopped)
         return;
 
@@ -112,7 +143,7 @@ if (false && analyserNode.frequencyBinCount != frequencyBinCount) {
     //}
 
     if (updateAxes)
-        createSpectrumAxes();
+        initUpperPanel();
 
     const canvasWidth = canvasSpectrumEl.width;
     const canvasHeight = canvasSpectrumEl.height;
@@ -131,46 +162,102 @@ if (false && analyserNode.frequencyBinCount != frequencyBinCount) {
         const bins = frequencyBinCount;
         const blitWidth = Math.min(canvasWaterfallWidth, yAxisX + yAxisDataMargin + (bins-1)*(barWidth+barSpacing)); // Maximum X value needed.
 
-        // Waterfall scroll step 1: blit on-screen minus oldest row to off-screen.
-        // drawImage usage:
-        //     drawImage(image, dx, dy)
-        //     drawImage(image, dx, dy, dWidth, dHeight)
-        //     drawImage(image, sx, sy, sWidth, sHeight, dx, dy, dWidth, dHeight)
+        // Scroll step 1: blit on-screen minus oldest row to off-screen.
+        // drawImage(image, sx, sy, sWidth, sHeight, dx, dy, dWidth, dHeight)
         if (waterfallScrollUp)
             bufferCanvasWaterfallCtx.drawImage(canvasWaterfallEl, 0, 1, blitWidth, canvasWaterfallHeight-1, 0, 0, blitWidth, canvasWaterfallHeight-1);
         else
             bufferCanvasWaterfallCtx.drawImage(canvasWaterfallEl, 0, 0, blitWidth, canvasWaterfallHeight-1, 0, 1, blitWidth, canvasWaterfallHeight-1);
 
 // FIXME: clear nemBin/nemSamples upon #bins change.
-        for (let i=0; i < bins; i++) {
-            const sampleDb = Math.max(fftAmpDb[i], minDecibels);
+        const showWaterfall = (displayLowerPanel === DisplayLower.waterfall);
+        let sumDb = 0;
+        for (let bin=1; bin < bins; bin++) {
+            const sampleDb = Math.max(spectrumAmpDb[bin], minDecibels);
             // === Spectrum analysis view ===
             // x,y is the upper left point of the rectangle.
-            const x = yAxisX + yAxisDataMargin + i*(barWidth+barSpacing);
+            const x = yAxisX + yAxisDataMargin + bin*(barWidth+barSpacing);
             const ratio = (sampleDb - minDecibels) / rangeDecibels;
             // const oneMinusRatio = 1.0 - ratio;
             const height = ratio * (canvasHeight - (xAxisY + xAxisDataMargin));
             const y = canvasSpectrumEl.height - (xAxisY + xAxisDataMargin + height);
             let fillStyle;
-            let intensity = Math.round(ratio * 255);
-            if (intensity > 255)
-                intensity = 255;
-            fillStyle = (nemTriggered[i]>0) ? colorMapNem[intensity] : colorMap[intensity];
+            let intensity = Math.min(Math.round(ratio * 255), 255);
+            fillStyle = (nemTriggered[bin]>0) ? colorMapNem[intensity] : colorMap[intensity];
             canvasSpectrumCtx.fillStyle = fillStyle;
             canvasSpectrumCtx.fillRect(x, y, barWidth, height);
 
-            // === Watervall view ===
-            // Waterfall scroll step 2: update latest row off-screen.
-            bufferCanvasWaterfallCtx.fillStyle = fillStyle;
-            const width = (barSpacing > 0) && (barWidth == 1) ? barWidth + 1 : barWidth;
-            if (waterfallScrollUp)
-                bufferCanvasWaterfallCtx.fillRect(x, canvasWaterfallHeight-1, width, 1);
-            else
-                bufferCanvasWaterfallCtx.fillRect(x, 0, width, 1);
+            if (showWaterfall) {
+                // === Watervall view ===
+                // Scroll step 2: update latest row off-screen.
+                bufferCanvasWaterfallCtx.fillStyle = fillStyle;
+                const width = (barSpacing > 0) && (barWidth == 1) ? barWidth + 1 : barWidth;
+                if (waterfallScrollUp)
+                    bufferCanvasWaterfallCtx.fillRect(x, canvasWaterfallHeight-1, width, 1);
+                else
+                    bufferCanvasWaterfallCtx.fillRect(x, 0, width, 1);
+            } else {
+                sumDb += metricsAmpDb[bin];
+            }
         }
 
-        // Waterfall scroll step 3: blit off-screen to on-screen.
-        canvasWaterfallCtx.drawImage(bufferCanvasWaterfallEl, 0, 0, blitWidth, canvasWaterfallHeight, 0, 0, blitWidth, canvasWaterfallHeight);
+        if (showWaterfall) {
+            // Scroll step 3: blit off-screen to on-screen.
+            canvasWaterfallCtx.drawImage(bufferCanvasWaterfallEl, 0, 0, blitWidth, canvasWaterfallHeight, 0, 0, blitWidth, canvasWaterfallHeight);
+        } else { // Metrics panel.
+            const ctx = canvasMetricsCtx;
+            const ctx2 = bufferCanvasMetricsCtx;
+            const el = canvasMetricsEl;
+            const el2 = bufferCanvasMetricsEl;
+            const canvasHeight = el.height;
+            function toCanvasY(y) { return((el.height-1) - y); }
+
+            const avgDb = sumDb / (frequencyBinCount - 1); // Skip DC bin.
+            const ratio = (avgDb - minDecibels) / rangeDecibels;
+            const height = ratio * (canvasHeight - (xAxisY + xAxisDataMargin));
+            const y = xAxisY + xAxisDataMargin + height;
+            let intensity = Math.min(Math.round(ratio * 255), 255);
+
+            const nonDataWidth = 1 + yAxisX + yAxisDataMargin;
+            const nonDataHeight = 1 + xAxisY + xAxisDataMargin;
+            const dataWidth = el.width - nonDataWidth;
+            const dataHeight = el.height - nonDataHeight;
+
+            if (metricsSamples < dataWidth) {
+                // Have not filled entire data area yet.  Draw on main canvas (no scrolling).
+                ctx.strokeStyle = colorMap[intensity];
+                ctx.beginPath();
+                // 0.5 added because otherwise canvas drawing creates wider & grayer lines.
+                ctx.moveTo(0.5 + nonDataWidth + metricsSamples, toCanvasY(xAxisY + xAxisDataMargin));
+                ctx.lineTo(0.5 + nonDataWidth + metricsSamples, toCanvasY(y));
+                ctx.stroke();
+            } else {
+                // Scroll step1: blit on-screen minus oldest column to off-screen.
+                const sx = nonDataWidth;
+                const sy = 0;
+                const dx = sx;
+                const dy = sy;
+                // drawImage(image, sx, sy, sWidth, sHeight, dx, dy, dWidth, dHeight)
+                ctx2.drawImage(el, sx+1, sy, dataWidth-1, dataHeight, dx, dy, dataWidth-1, dataHeight);
+
+                // Scroll step2: update latest column off-screen.
+                ctx2.strokeStyle = colorMap[intensity];
+                ctx2.beginPath();
+                ctx2.moveTo(el.width-1, toCanvasY(xAxisY + xAxisDataMargin));
+                ctx2.lineTo(el.width-1, toCanvasY(y));
+                ctx2.stroke();
+
+                ctx2.strokeStyle = canvasBg; // Clear pixels above line.
+                ctx2.beginPath();
+                ctx2.moveTo(el.width-1, toCanvasY(y+1));
+                ctx2.lineTo(el.width-1, 0);
+                ctx2.stroke();
+
+                // Scroll step 3: blit off-screen to on-screen.
+                ctx.drawImage(el2, sx, sy, dataWidth, dataHeight, dx, dy, dataWidth, dataHeight);
+            }
+            metricsSamples++;
+        }
     });
 }
 
@@ -227,7 +314,7 @@ function createColorMap() {
     colorMapNem = Array.from(Array(256), (_, i) => `rgb(0 ${i} 0)`);
 }
 
-function createSpectrumAxes() {
+function initUpperPanel() {
     // Clear canvas (could have been drawn with different params prior).
     canvasSpectrumCtx.fillStyle = canvasBg;
     canvasSpectrumCtx.fillRect(0, 0, canvasSpectrumEl.width, canvasSpectrumEl.height); // Clear canvas.
@@ -298,6 +385,80 @@ function createSpectrumAxes() {
         canvasSpectrumCtx.lineTo(x, yCanvas + tickLength);
         canvasSpectrumCtx.stroke();
         canvasSpectrumCtx.fillText(`${Math.round(freq)}`, x, yCanvas + tickLength + labelMargin);
+    }
+}
+
+function initLowerPanel() {
+    if (displayLowerPanel === DisplayLower.waterfall) {
+        canvasMetricsEl.style.display = "none"; // Invisible.
+        canvasWaterfallEl.style.display = "block"; // Enable.
+        canvasWaterfallCtx.fillStyle = canvasBg;
+        canvasWaterfallCtx.fillRect(0, 0, canvasWaterfallEl.width, canvasWaterfallEl.height);
+
+        // Create an off-screen buffer canvas for blitting regions to/from on-screen canvas (scrolling).
+        if (!bufferCanvasWaterfallEl) {
+            bufferCanvasWaterfallEl = document.createElement('canvas');
+            bufferCanvasWaterfallCtx = bufferCanvasWaterfallEl.getContext("2d");
+        }
+        bufferCanvasWaterfallEl.width = canvasWaterfallEl.width;
+        bufferCanvasWaterfallEl.height = canvasWaterfallEl.height;
+        bufferCanvasWaterfallCtx.fillStyle = canvasBg;
+        bufferCanvasWaterfallCtx.fillRect(0, 0, bufferCanvasWaterfallEl.width, bufferCanvasWaterfallEl.height);
+    } else {
+        canvasWaterfallEl.style.display = "none"; // Invisible.
+        const el = canvasMetricsEl;
+        const ctx = canvasMetricsCtx = el.getContext("2d");
+        el.style.display = "block"; // Enable.
+        ctx.fillStyle = canvasBg;
+        ctx.fillRect(0, 0, el.width, el.height);
+        metricsSamples = 0; // Reset.
+
+        if (!bufferCanvasMetricsEl) {
+            bufferCanvasMetricsEl = document.createElement('canvas');
+            bufferCanvasMetricsCtx = bufferCanvasMetricsEl.getContext("2d");
+        }
+        bufferCanvasMetricsEl.width = canvasWaterfallEl.width;
+        bufferCanvasMetricsEl.height = canvasWaterfallEl.height;
+        bufferCanvasMetricsCtx.fillStyle = canvasBg;
+        bufferCanvasMetricsCtx.fillRect(0, 0, bufferCanvasMetricsEl.width, bufferCanvasMetricsEl.height);
+
+        ctx.strokeStyle = "black";
+        function toCanvasY(y) { return((el.height-1) - y); }
+
+        // Y axis.
+        ctx.lineWidth = 2;
+        ctx.fillStyle = "black";
+        ctx.font = "12px trebuchet ms";
+        ctx.textAlign = "right";
+        ctx.textBaseline = "middle";
+        const yAxisHeight = el.height - xAxisY;
+        ctx.beginPath();
+        ctx.moveTo(yAxisX, 0);
+        ctx.lineTo(yAxisX, yAxisHeight);
+        ctx.stroke();
+
+        const yInterval = 8; // dB.
+        const decibelRange = maxDb - minDb;
+        for (let tickDb=minDb + yInterval/2; tickDb <= maxDb; tickDb += yInterval) {
+            const y = ((tickDb - minDb) / decibelRange) * yAxisHeight;
+            const yCanvas = el.height - (xAxisY + y);
+            ctx.beginPath();
+            ctx.moveTo(yAxisX, yCanvas);
+            ctx.lineTo(yAxisX - tickLength, yCanvas);
+            ctx.stroke();
+            ctx.fillText(`${tickDb}`, yAxisX - (tickLength + labelMargin), yCanvas);
+        }
+
+        // X axis.
+        ctx.beginPath();
+        ctx.moveTo(yAxisX, yAxisHeight);
+        ctx.lineTo(el.width-1, yAxisHeight);
+        ctx.stroke();
+
+        ctx.textAlign = "center";
+        ctx.textBaseline = "top";
+        ctx.fillText("time", el.width/2, toCanvasY(xAxisY - labelMargin*2));
+        ctx.lineWidth = 1;
     }
 }
 
@@ -399,25 +560,10 @@ function main() {
     canvasSpectrumCtx = canvasSpectrumEl.getContext("2d");
     canvasWaterfallEl = document.querySelector("#waterfall");
     canvasWaterfallCtx = canvasWaterfallEl.getContext("2d");
-    //canvasSpectrumEl.width = window.innerWidth
-    //canvasWaterfallEl.width = window.innerWidth
+    canvasMetricsEl = document.querySelector("#metrics");
 
     const bodyEl = document.querySelector("body");
     canvasBg = window.getComputedStyle(bodyEl).getPropertyValue('--canvasBg');
-
-    canvasSpectrumCtx.fillStyle = canvasBg;
-    canvasSpectrumCtx.fillRect(0, 0, canvasSpectrumEl.width, canvasSpectrumEl.height);
-
-    canvasWaterfallCtx.fillStyle = canvasBg;
-    canvasWaterfallCtx.fillRect(0, 0, canvasWaterfallEl.width, canvasWaterfallEl.height);
-
-    // Create an off-screen buffer canvas for blitting regions to/from on-screen canvas (scrolling).
-    bufferCanvasWaterfallEl = document.createElement('canvas');
-    bufferCanvasWaterfallEl.width = canvasWaterfallEl.width;
-    bufferCanvasWaterfallEl.height = canvasWaterfallEl.height;
-    bufferCanvasWaterfallCtx = bufferCanvasWaterfallEl.getContext("2d");
-    bufferCanvasWaterfallCtx.fillStyle = canvasBg;
-    bufferCanvasWaterfallCtx.fillRect(0, 0, bufferCanvasWaterfallEl.width, bufferCanvasWaterfallEl.height);
 
     createColorMap();
 
@@ -468,6 +614,8 @@ function main() {
     setFilter(filterTypeEl, filterLowEl, filterHighEl, posNumRe);
 
     const displayTypeEl = document.querySelector("#displayType");
+    const displayLowerPanelEl = document.querySelector("#lowerPanel");
+    displayLowerPanel = getLowerPanelType(displayLowerPanelEl.value);
 
     //denemDwellThresholdEl = document.querySelector("#dwellThreshold");
     //param = denemNode.parameters.get("dwellThreshold");
@@ -475,7 +623,8 @@ function main() {
 
     displayFreqMaxEl.value = Math.round(audioCtx.sampleRate / 2).toString();
 
-    createSpectrumAxes();
+    initUpperPanel();
+    initLowerPanel();
 
     sourceSelectEl.addEventListener('change', function (e) {
         const val = e.target.value;
@@ -639,19 +788,27 @@ function main() {
     displayTypeEl.addEventListener('change', function(e) {
         let val = displayTypeEl.value;
         let obj;
-        if (val === "sample")
+        if (val === "sample") {
             obj = { param: "displayType", value: DenemK.DisplayTypeSample };
-        else if (val === "average")
+            spectrumY = DenemK.DisplayTypeSample;
+        } else if (val === "average") {
             obj = { param: "displayType", value: DenemK.DisplayTypeAverage };
-        else {
+            spectrumY = DenemK.DisplayTypeAverage;
+        } else {
             throw new Error(`displayType of ${val}`);
+            spectrumY = DenemK.DisplayTypeSample;
         }
-        denemNode.port.postMessage(obj);
+        // denemNode.port.postMessage(obj);
+    });
+
+    displayLowerPanelEl.addEventListener("change", function(e) {
+        displayLowerPanel = getLowerPanelType(displayLowerPanelEl.value);
+        initLowerPanel();
     });
 
     denemNode.port.onmessage = (e) => {
         //console.log("msg", e.data.spectrum);
-        processAudio(e.data.fftAmpDb, e.data.nemTriggered);
+        processAudio(e.data);
     };
 }
 
