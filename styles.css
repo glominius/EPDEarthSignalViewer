@@ -81,7 +81,7 @@ button:active {
 
 #controlsSource > div {
     margin: 1px;
-    padding: 2px;
+    padding: 2px  4px  2px  4px; /* top right bottom left */
     min-height: 32px;
     border: 1px solid black;
     background-color: var(--controlsFieldBg);
@@ -93,7 +93,7 @@ button:active {
 
 #controlsParams > div {
     margin: 1px;
-    padding: 2px;
+    padding: 2px  4px  2px  4px; /* top right bottom left */
     min-height: 32px;
     border: 1px solid black;
     background-color: var(--controlsFieldBg);

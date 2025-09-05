@@ -18,7 +18,7 @@
             <div id="controlsSource">
                 <!-- feed select area -->
                 <div>
-                    &nbsp;[SOURCE]
+                    [SOURCE]
                     <div class="tooltip">
                         <select id="sourceSelect">
                             <option value="stream">audio stream</option>
@@ -41,16 +41,14 @@
 
                 <!-- play controls -->
                 <div>
-                    &nbsp;
                     <button class="mediaButton" type="button" id="playButton">&#x23F5;</button>
                     <button class="mediaButton" type="button" id="pauseButton" disabled>&#x23F8;</button>
                     <button class="mediaButton" type="button" id="stopButton" disabled>&#x23F9;</button>
-                    &nbsp;
                 </div>
 
                 <div>
                     <div class="tooltip">
-                        &nbsp;[DISPLAY]
+                        [DISPLAY]
                         <span class="tooltiptext">Display options.</span>
                     </div>
 
@@ -86,23 +84,21 @@
                         <span class="tooltiptext">Select amplitude display type: each sample or average in window.</span>
                     </div>
 
-                    &nbsp;lower panel
-                    <div class="tooltip">
-                        <select id="lowerPanel">
-                            <option value="waterfall" selected>waterfall</option>
-                            <option value="metrics">average</option>
-                        </select>
-                        <span class="tooltiptext">Select what's displayed in lower panel: waterfall or spectrum amplitude average over time.</span>
-                    </div>
-
                 </div>
+
+                <div class="tooltip">
+                    cursor
+                    <input type="text" value="" id="cursorInfo" readonly size="8" />
+                    <span class="tooltiptext">Moving cursor in spectrum window shows frequency band.</span>
+                </div>
+
             </div>
 
             <!-- Parameters row -->
             <div id="controlsParams">
                 <div>
                     <div class="tooltip">
-                        &nbsp;[FFT]
+                        [FFT]
                         <span class="tooltiptext">Fast Fourier Transform options.</span>
                     </div>
                     <div class="tooltip">
@@ -138,15 +134,9 @@
                     </div>
                 </div>
 
-                <div class="tooltip">
-                    &nbsp;cursor
-                    <input type="text" value="" id="cursorInfo" readonly size="8" />
-                    <span class="tooltiptext">Moving cursor in spectrum window shows frequency band.</span>
-                </div>
-
                 <div>
                     <div class="tooltip">
-                        &nbsp;[DENEM]
+                        [DENEM]
                         <span class="tooltiptext">"De-nem" filter options.  This is a frequency domain, adaptive, cross-sample sliding window filter.</span>
                     </div>
                     <div class="tooltip">
@@ -166,12 +156,11 @@
                         <input type="text" value="" id="denemAvgMin" size="6" /> dB
                         <span class="tooltiptext">Trigger only if average amplitude minimum in sliding window is &gt;= X.  Set to high value (e.g. 0) to disable.</span>
                     </div>
-
                 </div>
 
                 <div>
                     <div class="tooltip">
-                        &nbsp;[FILTER]
+                        [FILTER]
                         <span class="tooltiptext">Additional band pass/reject filter performed in frequency domain.</span>
                     </div>
 
@@ -195,6 +184,51 @@
                         <input type="text" value="" id="filterHigh" size="6" />
                         <span class="tooltiptext">High frequency of specified filter.</span>
                         Hz
+                    </div>
+                </div>
+
+
+                <div>
+                    <div class="tooltip">
+                        [LOWER PANEL]
+                        <span class="tooltiptext">Controls for the panel below the spectrum analyzer.</span>
+                    </div>
+
+                    <div class="tooltip">
+                        <select id="lowerPanel">
+                            <option value="waterfall" selected>waterfall</option>
+                            <option value="metrics">chart recorder</option>
+                        </select>
+                        <span class="tooltiptext">Select what's displayed in lower panel: waterfall or chart recorder (full spectrum average amplitude over time).</span>
+                    </div>
+
+                    <div id="crDiv" style="display:none">
+                        &nbsp;tick
+                        <div class="tooltip">
+                            <select id="crSamplesPerTick">
+                                <option value="1" selected>1</option>
+                                <option value="2">2</option>
+                                <option value="3">3</option>
+                                <option value="4">4</option>
+                                <option value="5">5</option>
+                                <option value="10">10</option>
+                                <option value="20">20</option>
+                                <option value="30">30</option>
+                                <option value="40">40</option>
+                                <option value="50">50</option>
+                            </select>
+                            <span class="tooltiptext">Select averaging timeframe per chart tick.</span>
+                        </div>
+
+                        &nbsp;zone
+                        <div class="tooltip">
+                            <select id="crZone">
+                                <option value="local" selected>local</option>
+                                <option value="UTC">UTC</option>
+                            </select>
+                            <span class="tooltiptext">Select time zone for chart recorder timestamps.</span>
+                        </div>
+
                     </div>
                 </div>
 

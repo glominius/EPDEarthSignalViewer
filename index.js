@@ -68,6 +68,7 @@ let minDb = -100;
 let maxDb = -20;
 const MIN_DB = -100;
 const MAX_DB = -10;
+const MaxDatapointsPerCRTick = 50;
 let cursorInfoEl;
 let nemSamples;
 let denemWindowEl;
@@ -77,7 +78,22 @@ let denemAvgMinEl;
 let denemNode;
 let displayLowerPanel = DisplayLower.waterfall;
 let spectrumY = DenemK.DisplayTypeSample;
-let metricsSamples = 0;
+const chartRecorder = {
+    samples: 0, // Samples accumulated for average spectrum dB tick.
+    samplesPerTick: 0,
+    avgAmp: new Float32Array(MaxDatapointsPerCRTick),
+    timestampTicks: 60, // Timestamp chart every X ticks.
+    ticks: undefined, // Ticks shown.
+    nonDataWidth: 1 + yAxisX + yAxisDataMargin,
+    nonDataHeight: 1 + xAxisY + xAxisDataMargin,
+    dataWidth: 0, // Defined on init.
+    dataHeight: 0, // Defined on init.
+    elWidth: 0, // Defined on init.
+    elHeight: 0, // Defined on init.
+    prevY: undefined,
+};
+const TimestampColor = "#3B383D";
+let crZone;
 
 
 function getLowerPanelType(str) {
@@ -149,9 +165,7 @@ if (false && analyserNode.frequencyBinCount != frequencyBinCount) {
     const canvasHeight = canvasSpectrumEl.height;
     const canvasWaterfallWidth = canvasWaterfallEl.width;
     const canvasWaterfallHeight = canvasWaterfallEl.height;
-    const minDecibels = minDb;
-    const maxDecibels = maxDb;
-    const rangeDecibels = maxDecibels - minDecibels;
+    const rangeDecibels = maxDb - minDb;
 
 
     // Display graphics when browswer is ready to draw.
@@ -173,11 +187,11 @@ if (false && analyserNode.frequencyBinCount != frequencyBinCount) {
         const showWaterfall = (displayLowerPanel === DisplayLower.waterfall);
         let sumDb = 0;
         for (let bin=1; bin < bins; bin++) {
-            const sampleDb = Math.max(spectrumAmpDb[bin], minDecibels);
+            const sampleDb = Math.max(spectrumAmpDb[bin], minDb);
             // === Spectrum analysis view ===
             // x,y is the upper left point of the rectangle.
             const x = yAxisX + yAxisDataMargin + bin*(barWidth+barSpacing);
-            const ratio = (sampleDb - minDecibels) / rangeDecibels;
+            const ratio = (sampleDb - minDb) / rangeDecibels;
             // const oneMinusRatio = 1.0 - ratio;
             const height = ratio * (canvasHeight - (xAxisY + xAxisDataMargin));
             const y = canvasSpectrumEl.height - (xAxisY + xAxisDataMargin + height);
@@ -205,60 +219,102 @@ if (false && analyserNode.frequencyBinCount != frequencyBinCount) {
             // Scroll step 3: blit off-screen to on-screen.
             canvasWaterfallCtx.drawImage(bufferCanvasWaterfallEl, 0, 0, blitWidth, canvasWaterfallHeight, 0, 0, blitWidth, canvasWaterfallHeight);
         } else { // Metrics panel.
-            const ctx = canvasMetricsCtx;
-            const ctx2 = bufferCanvasMetricsCtx;
-            const el = canvasMetricsEl;
-            const el2 = bufferCanvasMetricsEl;
-            const canvasHeight = el.height;
-            function canvasY(y) { return((el.height-1) - y); }
-
             const avgDb = sumDb / (frequencyBinCount - 1); // Skip DC bin.
-            const ratio = (avgDb - minDecibels) / rangeDecibels;
-            const height = ratio * (canvasHeight - (xAxisY + xAxisDataMargin));
-            const y = xAxisY + xAxisDataMargin + height;
-            let intensity = Math.min(Math.round(ratio * 255), 255);
-
-            const nonDataWidth = 1 + yAxisX + yAxisDataMargin;
-            const nonDataHeight = 1 + xAxisY + xAxisDataMargin;
-            const dataWidth = el.width - nonDataWidth;
-            const dataHeight = el.height - nonDataHeight;
-
-            if (metricsSamples < dataWidth) {
-                // Have not filled entire data area yet.  Draw on main canvas (no scrolling).
-                ctx.strokeStyle = colorMap[intensity];
-                ctx.beginPath();
-                // 0.5 added because otherwise canvas drawing creates wider & grayer lines.
-                ctx.moveTo(0.5 + nonDataWidth + metricsSamples, canvasY(xAxisY + xAxisDataMargin));
-                ctx.lineTo(0.5 + nonDataWidth + metricsSamples, canvasY(y));
-                ctx.stroke();
-            } else {
-                // Scroll step1: blit on-screen minus oldest column to off-screen.
-                const sx = nonDataWidth;
-                const sy = 0;
-                const dx = sx;
-                const dy = sy;
-                // drawImage(image, sx, sy, sWidth, sHeight, dx, dy, dWidth, dHeight)
-                ctx2.drawImage(el, sx+1, sy, dataWidth-1, dataHeight, dx, dy, dataWidth-1, dataHeight);
-
-                // Scroll step2: update latest column off-screen.
-                ctx2.strokeStyle = colorMap[intensity];
-                ctx2.beginPath();
-                ctx2.moveTo(el.width-1, canvasY(xAxisY + xAxisDataMargin));
-                ctx2.lineTo(el.width-1, canvasY(y));
-                ctx2.stroke();
-
-                ctx2.strokeStyle = canvasBg; // Clear pixels above line.
-                ctx2.beginPath();
-                ctx2.moveTo(el.width-1, canvasY(y+1));
-                ctx2.lineTo(el.width-1, 0);
-                ctx2.stroke();
-
-                // Scroll step 3: blit off-screen to on-screen.
-                ctx.drawImage(el2, sx, sy, dataWidth, dataHeight, dx, dy, dataWidth, dataHeight);
+            chartRecorder.avgAmp[chartRecorder.samples++] = avgDb;
+            if (chartRecorder.samples >= chartRecorder.samplesPerTick) {
+                emitCRTick();
             }
-            metricsSamples++;
         }
     });
+}
+
+function emitCRTick() {
+    const ctx = canvasMetricsCtx;
+    const el = canvasMetricsEl;
+    const cr = chartRecorder;
+
+    if (cr.ticks >= cr.dataWidth) {
+        function canvasY(y) { return((chartRecorder.elHeight-1) - y); }
+        const ctx2 = bufferCanvasMetricsCtx;
+        const el2 = bufferCanvasMetricsEl;
+        const sx = cr.nonDataWidth;
+        const sy = 0;
+        const dx = sx;
+        const dy = sy;
+
+        // Blit on-screen minus oldest column to off-screen.
+        // drawImage(image, sx, sy, sWidth, sHeight, dx, dy, dWidth, dHeight)
+        ctx2.drawImage(el, sx+1, sy, cr.dataWidth-1, cr.dataHeight, dx, dy, cr.dataWidth-1, cr.dataHeight);
+
+        // Blit off-screen to on-screen.
+        ctx.drawImage(el2, sx, sy, cr.dataWidth, cr.dataHeight, dx, dy, cr.dataWidth, cr.dataHeight);
+
+        // Clear pixels in column before drawing.
+        ctx.strokeStyle = canvasBg;
+        ctx.beginPath();
+        ctx.moveTo(el.width-1, canvasY(cr.nonDataHeight));
+        ctx.lineTo(el.width-1, canvasY(cr.elHeight-1));
+        ctx.stroke();
+    }
+
+    if ((chartRecorder.ticks % chartRecorder.timestampTicks) == 0) {
+        addCRTimestamp();
+    }
+
+    emitCRTickData(ctx, Math.min(cr.ticks, cr.dataWidth-1), -0.5);
+
+    // Reset counters.
+    chartRecorder.samples = 0;
+    chartRecorder.ticks++;
+}
+
+function crMinMax() {
+    let min = 1000;
+    let max = -1000;
+    for (let i=0; i<chartRecorder.samples; i++) {
+        min = Math.min(min, chartRecorder.avgAmp[i]);
+        max = Math.max(max, chartRecorder.avgAmp[i]);
+    }
+    return([min, max]);
+}
+
+function emitCRTickData(ctx, col /* 0 .. width-1 */, xOff) {
+    function canvasY(y) { return((chartRecorder.elHeight-1) - y); }
+
+    const rangeDecibels = maxDb - minDb;
+    if (chartRecorder.samples == 1) {
+        // Draw line from prev to point.
+        const ratio = (chartRecorder.avgAmp[0] - minDb) / rangeDecibels;
+        const x = chartRecorder.nonDataWidth + col;
+        const y = chartRecorder.nonDataHeight + (ratio * chartRecorder.dataHeight);
+        const intensity = Math.min(Math.round(ratio * 255), 255);
+        const prevY = (chartRecorder.prevY === undefined) ? y - 2 : chartRecorder.prevY;
+        const prevX = (col == 0) ? chartRecorder.nonDataWidth : x - 1;
+        chartRecorder.prevY = y; // For next iteration.
+
+        ctx.strokeStyle = colorMap[intensity];
+        ctx.beginPath();
+        ctx.moveTo(xOff + prevX, canvasY(prevY));
+        ctx.lineTo(xOff + x, canvasY(y));
+        ctx.stroke();
+    } else {
+        // Draw line from min to max.
+        const [min, max] = crMinMax();
+        const ratioMin = (min - minDb) / rangeDecibels;
+        const ratioMax = (max - minDb) / rangeDecibels;
+        const ratioAvg = (ratioMin + ratioMax) / 2;
+        const x = chartRecorder.nonDataWidth + col;
+        let minY = chartRecorder.nonDataHeight + (ratioMin * chartRecorder.dataHeight);
+        let maxY = chartRecorder.nonDataHeight + (ratioMax * chartRecorder.dataHeight);
+        const intensity = Math.min(Math.round(ratioAvg * 255), 255);
+
+        ctx.strokeStyle = colorMap[intensity];
+        ctx.lineWidth = 1.0;
+        ctx.beginPath();
+        ctx.moveTo(xOff + x, canvasY(minY));
+        ctx.lineTo(xOff + x, canvasY(maxY));
+        ctx.stroke();
+    }
 }
 
 function constructAudioPipeline() {
@@ -320,7 +376,7 @@ function initUpperPanel() {
     ctx.fillStyle = canvasBg;
     ctx.fillRect(0, 0, canvasSpectrumEl.width, canvasSpectrumEl.height); // Clear canvas.
 
-    ctx.lineWidth = 1;
+    ctx.lineWidth = 2;
     ctx.strokeStyle = "black";
     ctx.fillStyle = "black";
     const yAxisHeight = canvasSpectrumEl.height - xAxisY;
@@ -427,10 +483,19 @@ function initLowerPanel() {
         const ctx = canvasMetricsCtx = el.getContext("2d");
         const canvasHeight = el.height;
         const canvasWidth = el.width;
+
+        chartRecorder.elHeight = el.height;
+        chartRecorder.elWidth = el.width;
+        chartRecorder.dataWidth = chartRecorder.elWidth - chartRecorder.nonDataWidth;
+        chartRecorder.dataHeight = chartRecorder.elHeight - chartRecorder.nonDataHeight;
+
         el.style.display = "block"; // Enable.
         ctx.fillStyle = canvasBg;
         ctx.fillRect(0, 0, canvasWidth, canvasHeight);
-        metricsSamples = 0; // Reset.
+        chartRecorder.samples = 0; // Reset.
+        chartRecorder.ticks = 0; // Reset.
+// FIXME: remove
+//chartRecorder.ticks = 1900; // Reset.
 
         if (!bufferCanvasMetricsEl) {
             bufferCanvasMetricsEl = document.createElement('canvas');
@@ -480,19 +545,54 @@ function initLowerPanel() {
         // === X axis ===
         ctx.beginPath();
         ctx.moveTo(yAxisX, yAxisHeight);
-        ctx.lineTo(canvasWidth-1, yAxisHeight);
+        ctx.lineTo(0.5 + canvasWidth-1, yAxisHeight);
         ctx.stroke();
 
         ctx.textAlign = "center";
         ctx.textBaseline = "top";
         ctx.fillText("time", canvasWidth/2, canvasY(xAxisY - labelMargin*2));
         ctx.lineWidth = 1;
-
-        // Units label.
-        ctx.textAlign = "right";
-        ctx.textBaseline = "top";
-        ctx.fillText("Hz", yAxisX - tickLength, canvasY(xAxisY - (tickLength + labelMargin)));
     }
+}
+
+function addCRTimestamp() {
+    function canvasY(y) { return((chartRecorder.elHeight-1) - y); }
+    const d = new Date();
+    const options = {
+        timeStyle: "medium",
+        hourCycle: "h23",
+        dateStyle: "short"
+        };
+    if (crZone === "UTC")
+        options.timeZone = "UTC";
+    const ts = d.toLocaleString([], options);
+
+    const ctx = canvasMetricsCtx;
+    ctx.fillStyle = TimestampColor;
+    ctx.strokeStyle = TimestampColor;
+    // Dashed line, full-height.
+    ctx.save();
+    ctx.lineWidth = 1;
+    ctx.setLineDash([2, 5]); // dashes are 5px and spaces are 3px.
+    ctx.beginPath();
+    const x = chartRecorder.nonDataWidth + Math.min(chartRecorder.ticks, chartRecorder.dataWidth-1);
+    ctx.moveTo(-0.5 + x, canvasY(chartRecorder.elHeight));
+    ctx.lineTo(-0.5 + x, canvasY(chartRecorder.nonDataHeight));
+    ctx.stroke();
+
+    // Timestamp.
+    ctx.font = "12px trebuchet ms";
+    ctx.translate(x, 0); // Aligned at top of panel.
+    ctx.rotate(-Math.PI / 2);
+    ctx.textAlign = "right";
+    if (chartRecorder.ticks == 0) {
+        ctx.textBaseline = "top";
+        ctx.fillText(ts, 0, 4);
+    } else {
+        ctx.textBaseline = "bottom";
+        ctx.fillText(ts, 0, -4);
+    }
+    ctx.restore(); // Undo translation etc.
 }
 
 function setupLocalFileListener() {
@@ -649,10 +749,18 @@ function main() {
     const displayTypeEl = document.querySelector("#displayType");
     const displayLowerPanelEl = document.querySelector("#lowerPanel");
     displayLowerPanel = getLowerPanelType(displayLowerPanelEl.value);
+    const crDivEl = document.querySelector("#crDiv");
+    const crSamplesPerTickEl = document.querySelector("#crSamplesPerTick");
+
+    chartRecorder.samplesPerTick = Number(crSamplesPerTickEl.value);
+
+    const crZoneEl = document.querySelector("#crZone");
+    crZone = crZoneEl.value;
 
     //denemDwellThresholdEl = document.querySelector("#dwellThreshold");
     //param = denemNode.parameters.get("dwellThreshold");
     //denemDwellThresholdEl.value = param.value.toFixed(2);
+
 
     displayFreqMaxEl.value = Math.round(audioCtx.sampleRate / 2).toString();
 
@@ -836,7 +944,24 @@ function main() {
 
     displayLowerPanelEl.addEventListener("change", function(e) {
         displayLowerPanel = getLowerPanelType(displayLowerPanelEl.value);
+        if (displayLowerPanel == DisplayLower.metrics) {
+            crDivEl.style.display = "inline-block";
+        } else {
+            crDivEl.style.display = "none"; // Disappear.
+        }
         initLowerPanel();
+    });
+
+    crSamplesPerTickEl.addEventListener("change", function(e) {
+        const newVal = Number(e.target.value);
+        chartRecorder.prevY = undefined;
+        if (newVal <= chartRecorder.samples)
+            emitCRTick(); // Emit accumulated samples for current tick.
+        chartRecorder.samplesPerTick = Number(e.target.value);
+    });
+
+    crZoneEl.addEventListener("change", function(e) {
+        crZone = e.target.value;
     });
 
     denemNode.port.onmessage = (e) => {
