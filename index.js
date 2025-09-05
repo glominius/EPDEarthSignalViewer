@@ -557,15 +557,25 @@ function initLowerPanel() {
 
 function addCRTimestamp() {
     function canvasY(y) { return((chartRecorder.elHeight-1) - y); }
-    const d = new Date();
+    const now = new Date();
     const options = {
         timeStyle: "medium",
         hourCycle: "h23",
         dateStyle: "short"
         };
-    if (crZone === "UTC")
+    let ts, utc;
+    if (crZone === "UTC") {
         options.timeZone = "UTC";
-    const ts = d.toLocaleString([], options);
+        ts = now.toLocaleString([], options);
+        utc = "UTC+00:00";
+    } else {
+        ts = now.toLocaleString([], options);
+        const tzOff = -now.getTimezoneOffset(); // In minutes.
+        const tzSign = (tzOff >= 0) ? '+' : '-';
+        const tzHr = String(Math.abs(tzOff / 60)).padStart(2, '0');
+        const tzMin = String(tzOff % 60).padStart(2, '0');
+        utc = `UTC${tzSign}${tzHr}:${tzMin}`;
+    }
 
     const ctx = canvasMetricsCtx;
     ctx.fillStyle = TimestampColor;
@@ -585,12 +595,14 @@ function addCRTimestamp() {
     ctx.translate(x, 0); // Aligned at top of panel.
     ctx.rotate(-Math.PI / 2);
     ctx.textAlign = "right";
-    if (chartRecorder.ticks == 0) {
+    if (chartRecorder.ticks == 0) { // 1st tick has space only to right.
         ctx.textBaseline = "top";
         ctx.fillText(ts, 0, 4);
-    } else {
+        ctx.fillText(utc, 0, 16);
+    } else { // Other ticks, text is placed to left to make logic simple at right hand side.
         ctx.textBaseline = "bottom";
-        ctx.fillText(ts, 0, -4);
+        ctx.fillText(ts, 0, -3);
+        ctx.fillText(utc, 0, -15);
     }
     ctx.restore(); // Undo translation etc.
 }
