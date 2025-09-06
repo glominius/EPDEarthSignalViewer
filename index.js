@@ -135,20 +135,6 @@ function processAudio(data) {
     if (paused || stopped)
         return;
 
-    let updateAxes = false;
-    // HTML select may have requested a change in number of FFT bins.
-// FIXME: update fft
-if (false && analyserNode.frequencyBinCount != frequencyBinCount) {
-        analyserNode.fftSize = 2 * frequencyBinCount;
-
-        // Clear waterfall.
-        canvasWaterfallCtx.fillStyle = "black";
-        canvasWaterfallCtx.fillRect(0, 0, canvasWaterfallEl.width, canvasWaterfallEl.height);
-
-        // Recalculate axes and redraw.
-        updateAxes = true;
-    }
-
     //if (minDb != analyserNode.minDecibels) {
     //    analyserNode.minDecibels = minDb;
     //    updateAxes = true;
@@ -158,8 +144,8 @@ if (false && analyserNode.frequencyBinCount != frequencyBinCount) {
     //    updateAxes = true;
     //}
 
-    if (updateAxes)
-        initUpperPanel();
+    //if (updateAxes)
+    //    initUpperPanel();
 
     const canvasWidth = canvasSpectrumEl.width;
     const canvasHeight = canvasSpectrumEl.height;
@@ -731,7 +717,8 @@ function main() {
 
     smoothingSelectEl = document.querySelector("#smoothingSelect");
     fftBinsSelectEl = document.querySelector("#fftBinsSelect");
-    frequencyBinCount = parseInt(fftBinsSelectEl.value); // Start with default value.
+    frequencyBinCount = DenemK.DefaultBinCount;
+    fftBinsSelectEl.value = frequencyBinCount.toString();
     minDbEl = document.querySelector("#minDb");
     maxDbEl = document.querySelector("#maxDb");
     minDbEl.value = minDb.toString();

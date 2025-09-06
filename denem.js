@@ -2,8 +2,9 @@ import { FFT } from "./fft_js/fft.js";
 import { DenemK } from "./denem_k.js";
 
 class DenemProcessor extends AudioWorkletProcessor {
-    constructor(context) {
-        super(context, "denem");
+    constructor() {
+        super();
+        // Has access to sampleRate, currentFrame, currentTime
         this.binCount = DenemK.DefaultBinCount;
         this.sampleSize = this.binCount * 2;
         this.fft = new FFT(this.sampleSize); // Instance.
