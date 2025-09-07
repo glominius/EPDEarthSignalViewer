@@ -74,15 +74,6 @@
                     </div>
                     <div class="divider">&#9483;</div>
 
-                    spectrum Y
-                    <div class="tooltip">
-                        <select id="displayType">
-                            <option value="sample" selected>sample</option>
-                            <option value="average">average</option>
-                        </select>
-                        <span class="tooltiptext">Select amplitude display type: each sample or average in window.</span>
-                    </div>
-
                 </div>
 
                 <div class="tooltip">
@@ -102,7 +93,7 @@
                     </div>
                     <div class="tooltip">
                         smoothing
-                        <select id="smoothingSelect" disabled>
+                        <select id="smoothingSelect">
                             <option value="0.0">0.0 (none)</option>
                             <option value="0.1">0.1</option>
                             <option value="0.2">0.2</option>
@@ -113,9 +104,10 @@
                             <option value="0.7">0.7</option>
                             <option value="0.8">0.8</option>
                             <option value="0.9">0.9</option>
+                            <option value="0.95">0.95</option>
                             <option value="0.99">0.99 (lots)</option>
                         </select>
-                        <span class="tooltiptext">FFT cross-sample smoothing. [option disabled for now]</span>
+                        <span class="tooltiptext">FFT cross-sample smoothing.</span>
                     </div>
 
                     <div class="tooltip">
@@ -197,6 +189,15 @@
                             <option value="metrics">chart recorder</option>
                         </select>
                         <span class="tooltiptext">Select what's displayed in lower panel: waterfall or chart recorder (full spectrum average amplitude over time).</span>
+                    </div>
+
+                    <div class="tooltip">
+                        &nbsp;show
+                        <select id="waterfallSmoothing">
+                            <option value="0">sample</option>
+                            <option value="1">smoothing</option>
+                        </select>
+                        <span class="tooltiptext">Show either per-sample or FFT smoothed in waterfall.</span>
                     </div>
 
                     <div id="crDiv" style="display:none">

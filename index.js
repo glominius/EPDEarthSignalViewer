@@ -20,6 +20,7 @@ const DisplayLower = Object.freeze({
     waterfall: 1,
     metrics: 2,
 });
+let waterfallSmoothing;
 
 let audioCtx;
 let splitterNode;
@@ -58,6 +59,8 @@ let mediaElementSrc;
 let audioSourceIsFile = false;
 let fileDecodedBuffer;
 let smoothingSelectEl;
+let prevAmpDb;
+let fftSmoothing;
 let updateParameter = false;
 let fftBinsSelectEl;
 let frequencyBinCount;
@@ -76,7 +79,6 @@ let denemNode;
 let denemThreshold;
 let denemBins;
 let displayLowerPanel = DisplayLower.waterfall;
-let spectrumY = DenemK.DisplayTypeSample;
 const chartRecorder = {
     samples: 0, // Samples accumulated for average spectrum dB tick.
     samplesPerTick: 0,
@@ -124,10 +126,7 @@ function spectrumMouseMove(x, y) {
 // Graphics update routine called frequently.
 function processAudio(data) {
     let spectrumAmpDb;
-    if (spectrumY === DenemK.DisplayTypeSample)
-        spectrumAmpDb = data.fftAmpDb;
-    else
-        spectrumAmpDb = data.fftAmpAvgDb;
+    spectrumAmpDb = data.fftAmpDb;
     const metricsAmpDb = data.fftAmpDb;
     const nemTriggered = data.nemTriggered;
 
@@ -172,7 +171,9 @@ function processAudio(data) {
         const showWaterfall = (displayLowerPanel === DisplayLower.waterfall);
         let sumDb = 0;
         for (let bin=1; bin < bins; bin++) {
-            const sampleDb = Math.max(spectrumAmpDb[bin], minDb);
+            const sampleDbActual = Math.max(spectrumAmpDb[bin], minDb);
+            const sampleDb = (sampleDbActual * (1 - fftSmoothing)) + (prevAmpDb[bin] * fftSmoothing);
+            prevAmpDb[bin] = sampleDb; // For next iteration.
             // === Spectrum analysis view ===
             // x,y is the upper left point of the rectangle.
             const x = yAxisX + yAxisDataMargin + bin*(barWidth+barSpacing);
@@ -180,16 +181,23 @@ function processAudio(data) {
             // const oneMinusRatio = 1.0 - ratio;
             const height = ratio * (canvasHeight - (xAxisY + xAxisDataMargin));
             const y = canvasSpectrumEl.height - (xAxisY + xAxisDataMargin + height);
-            let fillStyle;
-            let intensity = Math.min(Math.round(ratio * 255), 255);
-            fillStyle = (nemTriggered[bin]>0) ? colorMapNem[intensity] : colorMap[intensity];
+            const intensity = Math.min(Math.round(ratio * 255), 255);
+            const triggered = nemTriggered[bin];
+            const fillStyle = triggered ? colorMapNem[intensity] : colorMap[intensity];
             canvasSpectrumCtx.fillStyle = fillStyle;
             canvasSpectrumCtx.fillRect(x, y, barWidth, height);
 
             if (showWaterfall) {
                 // === Watervall view ===
                 // Scroll step 2: update latest row off-screen.
-                bufferCanvasWaterfallCtx.fillStyle = fillStyle;
+                if (waterfallSmoothing) {
+                    bufferCanvasWaterfallCtx.fillStyle = fillStyle;
+                } else {
+                    const ratioActual = (sampleDbActual - minDb) / rangeDecibels;
+                    const intensityActual = Math.min(Math.round(ratioActual * 255), 255);
+                    const fillStyleActual = triggered ? colorMapNem[intensityActual] : colorMap[intensityActual];
+                    bufferCanvasWaterfallCtx.fillStyle = fillStyleActual;
+                }
                 const width = (barSpacing > 0) && (barWidth == 1) ? barWidth + 1 : barWidth;
                 if (waterfallScrollUp)
                     bufferCanvasWaterfallCtx.fillRect(x, canvasWaterfallHeight-1, width, 1);
@@ -444,6 +452,12 @@ function initUpperPanel() {
     ctx.textAlign = "right";
     ctx.textBaseline = "top";
     ctx.fillText("Hz", yAxisX - tickLength, canvasY(xAxisY - (tickLength + labelMargin)));
+
+    // Initialize previous sample array used for FFT smoothing.
+    prevAmpDb = new Float32Array(frequencyBinCount);
+    for (let bin=1; bin < frequencyBinCount; bin++) {
+        prevAmpDb[bin] = minDb;
+    }
 }
 
 function initLowerPanel() {
@@ -715,6 +729,7 @@ function main() {
     let feed = "stream";
 
     smoothingSelectEl = document.querySelector("#smoothingSelect");
+    fftSmoothing = Number(smoothingSelectEl.value);
     fftBinsSelectEl = document.querySelector("#fftBinsSelect");
     frequencyBinCount = DenemK.DefaultBinCount;
     fftBinsSelectEl.value = frequencyBinCount.toString();
@@ -744,9 +759,12 @@ function main() {
     filterHighEl.value = filterHighFrequency.toString();
     setFilter(filterTypeEl, filterLowEl, filterHighEl, posNumRe);
 
-    const displayTypeEl = document.querySelector("#displayType");
     const displayLowerPanelEl = document.querySelector("#lowerPanel");
     displayLowerPanel = getLowerPanelType(displayLowerPanelEl.value);
+
+    const waterfallSmoothingEl = document.querySelector("#waterfallSmoothing");
+    waterfallSmoothing = Boolean(Number(waterfallSmoothingEl.value));
+
     const crDivEl = document.querySelector("#crDiv");
     const crSamplesPerTickEl = document.querySelector("#crSamplesPerTick");
 
@@ -839,10 +857,9 @@ function main() {
         playbackStopped();
     });
 
-    //smoothingSelectEl.addEventListener('change', function(e) {
-    //    if (analyserNode)
-    //        analyserNode.smoothingTimeConstant = Number(smoothingSelectEl.value);
-    //});
+    smoothingSelectEl.addEventListener('change', function(e) {
+        fftSmoothing = Number(e.target.value);
+    });
 
     fftBinsSelectEl.addEventListener('change', function(e) {
         frequencyBinCount = parseInt(fftBinsSelectEl.value);
@@ -923,21 +940,6 @@ function main() {
         setFilter(filterTypeEl, filterLowEl, filterHighEl, posNumRe);
     });
 
-    displayTypeEl.addEventListener('change', function(e) {
-        let val = displayTypeEl.value;
-        let obj;
-        if (val === "sample") {
-            obj = { param: "displayType", value: DenemK.DisplayTypeSample };
-            spectrumY = DenemK.DisplayTypeSample;
-        } else if (val === "average") {
-            obj = { param: "displayType", value: DenemK.DisplayTypeAverage };
-            spectrumY = DenemK.DisplayTypeAverage;
-        } else {
-            throw new Error(`displayType of ${val}`);
-            spectrumY = DenemK.DisplayTypeSample;
-        }
-    });
-
     displayLowerPanelEl.addEventListener("change", function(e) {
         displayLowerPanel = getLowerPanelType(displayLowerPanelEl.value);
         if (displayLowerPanel == DisplayLower.metrics) {
@@ -946,6 +948,9 @@ function main() {
             crDivEl.style.display = "none"; // Disappear.
         }
         initLowerPanel();
+    });
+    waterfallSmoothingEl.addEventListener('change', function(e) {
+        waterfallSmoothing = Boolean(Number(e.target.value));
     });
 
     crSamplesPerTickEl.addEventListener("change", function(e) {
@@ -961,7 +966,6 @@ function main() {
     });
 
     denemNode.port.onmessage = (e) => {
-        //console.log("msg", e.data.spectrum);
         processAudio(e.data);
     };
 }

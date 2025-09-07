@@ -26,7 +26,6 @@ class DenemProcessor extends AudioWorkletProcessor {
             }));
         this.portObj = {
             fftAmpDb: this.fftAmpDb,
-            fftAmpAvgDb: this.fftAmpAvgDb,
             nemTriggered: this.nemTriggered,
         };
         this.port.onmessage = (e) => {
