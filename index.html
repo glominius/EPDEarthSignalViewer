@@ -60,8 +60,7 @@
                     <div class="tooltip">
                         <input type="text" id="displayFreqMax" value="" size="5" disabled />
                         <span class="tooltiptext">Maximum frequency to display. [option disabled for now]</span>
-                    </div>
-                    Hz
+                    </div>&thinsp;Hz
                     <div class="divider">&#9483;</div>
 
                     <div class="tooltip">
@@ -70,7 +69,7 @@
                     </div>
                     ..
                     <div class="tooltip">
-                        <input type="text" id="maxDb" value="" size=5 title="min < max <= -10" disabled /> dB
+                        <input type="text" id="maxDb" value="" size=5 title="min < max <= -10" disabled />&thinsp;dB
                         <span class="tooltiptext">Maximum dB to display. Also used for color gradient. [option disabled for now]</span>
                     </div>
                     <div class="divider">&#9483;</div>
@@ -88,7 +87,7 @@
 
                 <div class="tooltip">
                     cursor
-                    <input type="text" value="" id="cursorInfo" readonly size="8" />
+                    <input type="text" value="" id="cursorInfo" readonly size="5" />&thinsp;Hz
                     <span class="tooltiptext">Moving cursor in spectrum window shows frequency band.</span>
                 </div>
 
@@ -141,21 +140,20 @@
                     </div>
                     <div class="tooltip">
                         &nbsp;window
-                        <input type="text" value="" id="denemWindow" size="5" />
+                        <input type="text" value="" id="denemWindow" size="4" />
                         <span class="tooltiptext">#FFT samples in sliding window.</span>
                     </div>
-
                     <div class="tooltip">
-                        &nbsp;deviation
-                        <input type="text" value="" id="denemDeviationAvgMax" size="6" /> dB
-                        <span class="tooltiptext">Trigger only if average amplitude deviation in sliding window is &lt;= X.</span>
+                        &nbsp;threshold
+                        <input type="text" value="" id="denemThreshold" size="4" />&thinsp;dB
+                        <span class="tooltiptext">Idenfify FFT bin as nem if this level above neighboring bins. Use large val (e.g. 100) to disable filter.</span>
+                    </div>
+                    <div class="tooltip">
+                        &nbsp;bins
+                        <input type="text" value="" id="denemBins" size="3" />
+                        <span class="tooltiptext">Number of neighboring FFT bins in each direction to compare to for nem identification.</span>
                     </div>
 
-                    <div class="tooltip">
-                        &nbsp;min
-                        <input type="text" value="" id="denemAvgMin" size="6" /> dB
-                        <span class="tooltiptext">Trigger only if average amplitude minimum in sliding window is &gt;= X.  Set to high value (e.g. 0) to disable.</span>
-                    </div>
                 </div>
 
                 <div>
@@ -180,11 +178,10 @@
                     </div>
 
                     <div class="tooltip">
-                        &nbsp;..
+                        ..
                         <input type="text" value="" id="filterHigh" size="6" />
                         <span class="tooltiptext">High frequency of specified filter.</span>
-                        Hz
-                    </div>
+                    </div>&thinsp;Hz
                 </div>
 
 

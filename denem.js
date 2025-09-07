@@ -17,10 +17,12 @@ class DenemProcessor extends AudioWorkletProcessor {
         this.bufferOff = 0;
         this.nemTriggered = new Uint8Array(this.binCount);
         this.nemSamples = 0;
+        this.neighborThresh = DenemK.NeighborDbThreshold;
+        this.neighborBins = DenemK.NeighborBins;
         this.windowSizePrev = DenemK.DefaultWindowSize;
         this.nemHisto = Array.from({ length: this.binCount }, (_, i) => ({
             ampSum: 0,
-            ampDeviationSum: 0,
+            // ampDeviationSum: 0,
             }));
         this.portObj = {
             fftAmpDb: this.fftAmpDb,
@@ -29,19 +31,23 @@ class DenemProcessor extends AudioWorkletProcessor {
         };
         this.port.onmessage = (e) => {
             const obj = e.data;
-            //if (obj.param === "displayType") {
-            //    this.displayType = obj.value;
-            //} else {
-            //    console.log("message unrecognized", obj);
-            //}
+            switch (obj.param) {
+                case "threshold":
+                    this.neighborThresh = obj.value;
+                    break;
+                case "bins":
+                    this.neighborBins = obj.value;
+                    break;
+                default:
+                    console.log(`Unrecognized param: ${obj.param}`);
+                    break;
+            }
         };
     }
 
     clearNemHisto() {
         for (const entry of this.nemHisto) {
             entry.ampSum = 0;
-            entry.ampDeviationSum = 0;
-            //entry.triggerDwell = 0; // Increment each sample triggered, decrement otherwise.
         }
         this.nemSamples = 0;
     }
@@ -63,14 +69,6 @@ class DenemProcessor extends AudioWorkletProcessor {
               defaultValue: DenemK.DefaultWindowSize,
           },
           {
-              name: "ampDeviationAvgMax",
-              defaultValue: DenemK.DefaultAmpDeviationAvgMax,
-          },
-          {
-              name: "ampAvgMin",
-              defaultValue: DenemK.DefaultAmpAvgMin,
-          },
-          {
               name: "filterType",
               defaultValue: DenemK.FilterNone,
               minValue: DenemK.FilterNone,
@@ -84,10 +82,6 @@ class DenemProcessor extends AudioWorkletProcessor {
               name: "filterHighBin",
               defaultValue: 0,
           },
-          //{
-          //    name: "dwellThreshold",
-          //    defaultValue: DenemK.DefaultDwellTheshold,
-          //},
         ];
     }
 
@@ -128,12 +122,9 @@ class DenemProcessor extends AudioWorkletProcessor {
     // Process 1 sample of the specified FFT input size.
     processSample(parameters) {
         const windowSize         = parameters.windowSize[0];
-        const ampDeviationAvgMax = parameters.ampDeviationAvgMax[0];
-        const ampAvgMin          = parameters.ampAvgMin[0];
         const filterType         = parameters.filterType[0];
         const filterLowBin       = parameters.filterLowBin[0];
         const filterHighBin      = parameters.filterHighBin[0];
-        //const dwellThreshold     = parameters.dwellThreshold[0];
 
         const binScalar = (1 / this.binCount); // Half of fft.size.
         const binsDiv2 = this.binCount >> 2;
@@ -147,7 +138,8 @@ class DenemProcessor extends AudioWorkletProcessor {
         this.fft.completeSpectrum(this.fftOut);
 
         this.nemSamples++;
-        for (let bin=1; bin < (this.fft.size>>1); bin++) {
+        const lastBin = (this.fft.size>>1) - 1;
+        for (let bin=1; bin <= lastBin; bin++) {
             const real = this.fftOut[bin*2];
             const imag = this.fftOut[bin*2+1];
             const amp = Math.sqrt(real*real + imag*imag);
@@ -159,8 +151,6 @@ class DenemProcessor extends AudioWorkletProcessor {
             nemBin.ampSum += sampleDb;
             const denom = Math.min(windowSize, this.nemSamples);
             const ampAvg = nemBin.ampSum / denom;
-            const ampDeviation = Math.abs(ampAvg - sampleDb);
-            nemBin.ampDeviationSum += ampDeviation;
             this.nemTriggered[bin] = 0; // False.
 
             // Values passed back to main UI.
@@ -168,26 +158,28 @@ class DenemProcessor extends AudioWorkletProcessor {
             this.fftAmpAvgDb[bin] = ampAvg;
 
             if (this.nemSamples >= windowSize) {
-                const ampDeviationAvg = nemBin.ampDeviationSum / windowSize;
-                let triggerAvgMin = ampAvgMin;
-
-                let triggerDeviation = ampDeviationAvgMax;
-
-                let windowTrigger = (ampAvg >= triggerAvgMin) && (ampDeviationAvg <= triggerDeviation);
-
-                if (windowTrigger) {
-                    this.zeroBin(bin); // This bin has nem characteristics; zero out real/imag components.
-                }
                 // Sliding window: effectively drop leading sample value for next iteration.
                 nemBin.ampSum = ampAvg * (windowSize - 1);
-                nemBin.ampDeviationSum = ampDeviationAvg * (windowSize - 1);
             }
-            if ((filterType == DenemK.FilterBandPass) && ((bin < filterLowBin) || (bin > filterHighBin))) {
+        }
+
+        for (let bin=1; bin <= lastBin; bin++) {
+            let trigger = false;
+
+            if (this.nemSamples >= windowSize) {
+                for (let neighbor=1; neighbor<=this.neighborBins; neighbor++) {
+                    const binLeft = bin - neighbor;
+                    const binRight = bin + neighbor;
+                    const avg = this.fftAmpAvgDb[bin];
+                    trigger ||= (binLeft >= 1) && ((avg - this.fftAmpAvgDb[binLeft]) >= this.neighborThresh);
+                    trigger ||= (binRight <= lastBin) && ((avg - this.fftAmpAvgDb[binRight]) >= this.neighborThresh);
+                }
+            }
+            trigger ||= (filterType == DenemK.FilterBandPass)   && ((bin < filterLowBin) || (bin > filterHighBin));
+            trigger ||= (filterType == DenemK.FilterBandReject) && ((bin >= filterLowBin) && (bin <= filterHighBin));
+            
+            if (trigger)
                 this.zeroBin(bin);
-            }
-            else if ((filterType == DenemK.FilterBandReject) && ((bin >= filterLowBin) && (bin <= filterHighBin))) {
-                this.zeroBin(bin);
-            }
         }
 
         this.fftAmpDb[0] = -100; // Zero DC component.
