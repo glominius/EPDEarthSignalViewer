@@ -14,6 +14,7 @@ const xAxisDataMargin = 2;
 const tickLength = 4;
 const labelMargin = 2;
 const DisplayWaterfall = 0;
+const GainMax = 10;
 
 const nemMinWindowSize = 10; // Arbitrary.
 const DisplayLower = Object.freeze({
@@ -25,6 +26,7 @@ let waterfallSmoothing;
 let audioCtx;
 let splitterNode;
 let audioSourceNode;
+let gainNode;
 let playButton;
 let pauseButton;
 let stopButton;
@@ -95,6 +97,7 @@ const chartRecorder = {
 };
 const TimestampColor = "#3B383D";
 let crZone;
+let gain = 1.0;
 
 
 function getLowerPanelType(str) {
@@ -326,6 +329,8 @@ function constructAudioPipeline() {
         splitterNode.disconnect();
     if (denemNode)
         denemNode.disconnect();
+    if (gainNode)
+        gainNode.disconnect();
 
     if (audioSourceIsFile) { // File.
         // Create a buffer source node from previously decoded file.
@@ -349,9 +354,13 @@ function constructAudioPipeline() {
     }
 
     splitterNode = audioCtx.createChannelSplitter(1);
+    gainNode = audioCtx.createGain();
+    gainNode.gain.value = gain;
 
+    // Connect the flow.
     audioSourceNode.connect(splitterNode);
-    splitterNode.connect(denemNode);
+    splitterNode.connect(gainNode);
+    gainNode.connect(denemNode);
     denemNode.connect(audioCtx.destination);
 
     if (audioSourceIsFile)
@@ -778,11 +787,13 @@ function main() {
     denemBinsEl = document.querySelector("#denemBins");
     denemBinsEl.value = DenemK.NeighborBins.toString();
 
-
     displayFreqMaxEl.value = Math.round(audioCtx.sampleRate / 2).toString();
 
     initUpperPanel();
     initLowerPanel();
+
+    const gainEl = document.querySelector("#gain");
+    gainEl.value = gain.toFixed(2);
 
     sourceSelectEl.addEventListener('change', function (e) {
         const val = e.target.value;
@@ -963,6 +974,18 @@ function main() {
 
     crZoneEl.addEventListener("change", function(e) {
         crZone = e.target.value;
+    });
+
+    gainEl.addEventListener("change", function(e) {
+        const valStr = e.target.value;
+        const val = Number(valStr);
+        if (posNumRe.test(valStr) && (val <= GainMax)) {
+            gain = val;
+            if (gainNode)
+                gainNode.gain.value = gain;
+        } else {
+            e.target.value = gain.toFixed(2); // Reset to last known good value.
+        }
     });
 
     denemNode.port.onmessage = (e) => {

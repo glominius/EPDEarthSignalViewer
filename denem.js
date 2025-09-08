@@ -22,7 +22,6 @@ class DenemProcessor extends AudioWorkletProcessor {
         this.windowSizePrev = DenemK.DefaultWindowSize;
         this.nemHisto = Array.from({ length: this.binCount }, (_, i) => ({
             ampSum: 0,
-            // ampDeviationSum: 0,
             }));
         this.portObj = {
             fftAmpDb: this.fftAmpDb,
