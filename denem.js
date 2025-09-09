@@ -51,7 +51,7 @@ class DenemProcessor extends AudioWorkletProcessor {
     }
 
     zeroBin(bin) {
-        this.nemTriggered[bin] = 1; // True.
+        this.nemTriggered[bin] = 1; // Passed back to UI.
 
         // Remove this frequency band.
         this.fftOut[bin*2] = 0;
@@ -151,8 +151,7 @@ class DenemProcessor extends AudioWorkletProcessor {
             const ampAvg = nemBin.ampSum / denom;
             this.nemTriggered[bin] = 0; // False.
 
-            // Values passed back to main UI.
-            this.fftAmpDb[bin] = sampleDb;
+            this.fftAmpDb[bin] = sampleDb; // Passed back to main UI.
             this.fftAmpAvgDb[bin] = ampAvg;
 
             if (this.nemSamples >= windowSize) {
@@ -161,6 +160,7 @@ class DenemProcessor extends AudioWorkletProcessor {
             }
         }
 
+        if (false) // Disabled for now.
         for (let bin=1; bin <= lastBin; bin++) {
             let trigger = false;
 

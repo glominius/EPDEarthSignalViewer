@@ -753,14 +753,6 @@ function main() {
     let param = denemNode.parameters.get("windowSize");
     denemWindowEl.value = param.value.toString();
 
-    //denemDeviationAvgMaxEl = document.querySelector("#denemDeviationAvgMax");
-    //param = denemNode.parameters.get("ampDeviationAvgMax");
-    //denemDeviationAvgMaxEl.value = param.value.toFixed(2);
-
-    //denemAvgMinEl = document.querySelector("#denemAvgMin");
-    //param = denemNode.parameters.get("ampAvgMin");
-    //denemAvgMinEl.value = param.value.toString();
-
     const filterTypeEl = document.querySelector("#filterType");
     const filterLowEl = document.querySelector("#filterLow");
     const filterHighEl =  document.querySelector("#filterHigh");
